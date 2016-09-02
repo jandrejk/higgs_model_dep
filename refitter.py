@@ -81,8 +81,8 @@ def mergeHists(hists):
     return hsum
 
 # ---------------------------------------------------------------------------
-def drawHists(procHistos,ncols=None,htitle=None,nplots=None):
-    canv = RT.TCanvas()
+def drawHists(procHistos,ncols=None,htitle=None,nplots=None,name=None):
+    canv = RT.TCanvas() if not name else RT.TCanvas(name,name)
     
     if not nplots:
         nplots = procHistos.ncats
