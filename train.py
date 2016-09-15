@@ -196,16 +196,22 @@ class EfficiencyFitter(object):
                cvoptimize=False,split=True,               
                classifier=ensemble.GradientBoostingClassifier,
                addprobs=True,addval=False,
-               trainevts=-1,
+               trainevts=-1,mask=None,
                **kwargs):
         
+        if mask != None:
+            self.split = None
+            df = self.df[mask]
+        else:
+            df = self.df
+            
         if split:
             split_params = kwargs.get('split_params',self.split_params)
             if not self.split:
-                self.split = skl.cross_validation.train_test_split(self.df,**split_params)
+                self.split = skl.cross_validation.train_test_split(df,**split_params)
                 traindf,testdf = self.split
         else:
-            traindf = self.df
+            traindf = df
             
         X_train,y_train = traindf[Xbr],traindf[Ybr]
         w_train = None if not wbr else traindf[wbr]
@@ -224,6 +230,9 @@ class EfficiencyFitter(object):
         clf = classifier(verbose=1,**kwargs)
         clf.fit(X_train[:trainevts],y_train[:trainevts],sample_weight=w_train[:trainevts])
         clf.inputs = Xbr
+
+        if mask != None:
+            self.split = None
         
         self.runPrediction(Ybr,clf,addprobs=addprobs,addval=addval)
         ## if addprobs:
@@ -270,10 +279,9 @@ class EfficiencyFitter(object):
         if not clf:
             clf    = self.clfs[target]
         inputs = clf.inputs
-        if target != 'class': target = self._binColName(target)[1]
-
+        
         if addprobs:
-            column_names = map(lambda x: "%s_prob_%d" % (target,x), xrange(clf.loss_.K))
+            column_names = map(lambda x: "%s_prob_%d" % (target,x), xrange(len(clf.classes_)))
             column_probs = clf. predict_proba(self.df[inputs])
             
             for icol,name in enumerate(column_names):
@@ -290,17 +298,21 @@ class EfficiencyFitter(object):
         return '%sBin' % column,'%sCat' % column
           
     # ---------------------------------------------------------------------------
-    def fitBins(self,column,Xbr,includeClassProbs=True,boundaries=[],**kwargs):
+    def fitBins(self,column,Xbr,factorized=False,includeClassProbs=True,boundaries=[],**kwargs):
 
         binColumn,catColumn = self._binColName(column)
         
         if not catColumn in self.df.columns:
             self.defineBins(column,boundaries)
         
-        if includeClassProbs:
-            Xbr.extend( filter(lambda x: x.startswith("class_prob_"), self.df.columns  ) )
+        if factorized:
+            clf = self.runFit(Xbr,binColumn,'absweight',mask=(self.df['class']>=0),**kwargs)
+        else:
+            if includeClassProbs:
+                Xbr.extend( filter(lambda x: x.startswith("class_prob_"), self.df.columns  ) )
             
-        clf = self.runFit(Xbr,catColumn,'absweight',**kwargs)
+            clf = self.runFit(Xbr,catColumn,'absweight',**kwargs)
+            
         self.clfs[column] = clf
         
         return binColumn,catColumn,clf

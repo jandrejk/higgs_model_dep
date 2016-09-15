@@ -11,6 +11,7 @@ def rat_plus_remind(num,den):
 
 # ---------------------------------------------------------------------------
 def scatter_hist(df,columns,cmap=plt.cm.Blues,figsize=(14,8),colorbar=False,
+                 log=False,
                  **kwargs):
     
     ncols = len(columns)
@@ -20,16 +21,16 @@ def scatter_hist(df,columns,cmap=plt.cm.Blues,figsize=(14,8),colorbar=False,
         xargs = {}
         if type(xcol) == tuple: 
             xcol, xargs = xcol
-        xlabel = xargs.get('xlabel',xcol.split("_")[-1])
+        xlabel = "cat "+xargs.get('xlabel',xcol.split("_")[-1])
         for iy,ycol in enumerate(columns):
-            histargs = { "bins" : 20, "normed" : True, "log" }
+            histargs = { "bins" : 20 } #, "normed" : True, "log" : log }
             histargs.update(xargs)
             yargs = {}
             if type(ycol) == tuple: 
                 ycol,yargs = ycol
-            ylabel = yargs.get('ylabel',ycol.split("_")[-1])
+            ylabel = "cat "+yargs.get('ylabel',ycol.split("_")[-1])
             if iy == ix:
-                axarr[ix,iy].hist(df[xcol],**histargs)
+                axarr[ix,iy].hist(df[xcol],weights=df['weight'],**histargs)
             else:
                 axarr[iy,ix].hexbin(x=df[xcol],y=df[ycol],C=df['weight'],cmap=cmap)
                 if colorbar: plt.colorbar(ax=axarr[iy,ix])
@@ -40,8 +41,8 @@ def scatter_hist(df,columns,cmap=plt.cm.Blues,figsize=(14,8),colorbar=False,
             if iy == ncols-1:
                 axarr[iy,ix].set_xlabel(xlabel)
             else:
-                plt.setp(axarr[iy,ix].get_yticklabels(), visible=False)
-
+                plt.setp(axarr[iy,ix].get_xticklabels(), visible=False)
+                
     plt.show()
 
 # ---------------------------------------------------------------------------
