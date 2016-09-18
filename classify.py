@@ -13,23 +13,30 @@ class BinnedFitter(BaseEstimator,ClassifierMixin):
     def fit(self, X, y, sample_weight=None):
         self.classes_, indices = np.unique(y,return_inverse=True)
         
-        self.bin_edges_, denom = np.histogramdd(X,bins=self.bins,weights=sample_weight,range=self.ranges)
-        self.weights_ = map(lambda ind: np.histogramdd(X[ind],bins=self.bins,weights=sample_weight,range=self.ranges)[1]/denom, indices)
+        masks = [ y == cl for cl in self.classes_ ]
+        
+        denom, self.bin_edges_  = np.histogramdd(X,weights=sample_weight.ravel(),bins=self.bins,range=self.ranges)
+        self.weights_ = map(lambda mask: np.histogramdd(X[mask],bins=self.bins,weights=sample_weight[mask],range=self.ranges)[0]/denom, masks)
+        
+        replace = denom == 0.
+        self.weights_[0][replace] = 1.
+        for wei in self.weights_[1:]: wei[replace] = 0.
+        self.dims_ = denom.shape
+        self.weights_ = np.vstack( map(lambda w: w.ravel(), self.weights_) ).transpose()
         
 
     # ---------------------------------------------------------------------------
-    def predict(X):
+    def predict(self,X):
         return np.argmax(self.predict_proba(X),axis=1)
         
     # ---------------------------------------------------------------------------
-    def predict_proba(X):
+    def predict_proba(self,X):
         
         # this is too convoluted
-        indexes = map(lambda y: tuple(y), 
-                      np.array(map(lambda x: np.digitize(X[:,x],self.bin_edges_[x][1:-1]), xrange(X.shape[1]))).transpose()
-                  )
+        indexes = np.array(map(lambda x: np.digitize(X[:,x],self.bin_edges_[x][1:-1]), xrange(X.shape[1]))).transpose()
         
-        return np.array( map(lambda ind: np.array(map(lambda w: w[ind], self.weights_ ) ), indexes ) )
+        ret = np.apply_along_axis(lambda ind: self.weights_[np.ravel_multi_index(ind,self.dims_),:], 1, indexes)
+        return ret
                 
     # ---------------------------------------------------------------------------
     def get_params(self, deep=True):

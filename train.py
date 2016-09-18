@@ -12,7 +12,11 @@ import sklearn as skl
 from sklearn import ensemble
 
 from gzip import open as gopen
-import pickle
+try:
+   import cPickle as pickle
+except:
+   import pickle
+# import pickle
 
 import itertools
 
@@ -70,6 +74,13 @@ class IO(object):
 
     # ---------------------------------------------------------------------------
     @staticmethod
+    def reload(obj):
+        new = type(obj)(obj.name)
+        new.__dict__.update(obj.__dict__)
+        return new
+
+    # ---------------------------------------------------------------------------
+    @staticmethod
     def saveData(obj):
         obj.df.to_root(os.path.join(obj.outdir,obj.name)+'.root',mode='w')
     
@@ -103,7 +114,7 @@ class IO(object):
             print("loading data %s" % dname)
             obj.df = IO.loadData(dname)
         
-        return obj
+        return IO.reload(obj)
     
     # ---------------------------------------------------------------------------
     @staticmethod
@@ -132,8 +143,7 @@ class EfficiencyFitter(object):
         self.outdir = outdir
 
         self.df = None
-        self.split = None
-        self.split_params = {}
+        self.split_frac = 0.75
         self.best_params = {}
 
         self.recoBranches = []
@@ -210,16 +220,19 @@ class EfficiencyFitter(object):
         else:
             df = self.df
 
-        split_params = kwargs.get('split_params',self.split_params)
+        ## split_params = kwargs.get('split_params',self.split_params)
         if split:
-            if not self.split:
-                self.split = skl.cross_validation.train_test_split(df,**split_params)
-                traindf,testdf = self.split
+            ### if not self.split:
+            ###     self.split = skl.cross_validation.train_test_split(df,**split_params)
+            ###     traindf,testdf = self.split
+            split_frac = kwargs.get('split_frac',self.split_frac)
+            first_train_evt = int(round(df.index.size*(1.-split_frac)))
+            traindf = df[first_train_evt:]
         else:
             traindf = df
             
-        X_train,y_train = traindf[Xbr],traindf[Ybr]
-        w_train = None if not wbr else traindf[wbr]
+        X_train,y_train = traindf[Xbr][:trainevts].values,traindf[Ybr][:trainevts].values
+        w_train = None if not wbr else traindf[wbr][:trainevts].values
         
         print "cvoptimize", cvoptimize
         if cvoptimize:
@@ -228,27 +241,22 @@ class EfficiencyFitter(object):
             
             cvClf = skl.grid_search.RandomizedSearchCV(classifier(**kwargs),cv_params_grid,cv=cv_nfolds)
             
-            cvClf.fit(X_train[:trainevts],y_train[:trainevts])
+            cvClf.fit(X_train,y_train)
             self.best_params[Ybr] = cvClf.best_params_
             kwargs.update(cvClf.best_params_)
             
         clf = classifier(**kwargs)
-        clf.fit(X_train[:trainevts],y_train[:trainevts],sample_weight=w_train[:trainevts])
+        print(X_train.shape,X_train.size)
+        print(y_train.shape,y_train.size)
+        print(w_train.shape,w_train.size)
+        
+        clf.fit(X_train,y_train,sample_weight=w_train)
         clf.inputs = Xbr
 
-        if mask != None:
-            self.split = None
+        ### if mask != None:
+        ###     self.split = None
         
         self.runPrediction(Ybr,clf,addprobs=addprobs,addval=addval)
-        ## if addprobs:
-        ##     column_names = map(lambda x: "%s_prob_%d" % (Ybr,x), xrange(clf.loss_.K))
-        ##     column_probs = clf. predict_proba(self.df[Xbr])
-        ##     
-        ##     for icol,name in enumerate(column_names):
-        ##         self.df[name] = column_probs[:,icol]
-        ##         
-        ## if addval:
-        ##     df["%s_predict" % Ybr] = clf.predict(df[Xbr])
             
         return clf
         
@@ -277,7 +285,16 @@ class EfficiencyFitter(object):
         
         return binColumn,catColumn
 
-        
+    
+    # ---------------------------------------------------------------------------
+    def cleanClfs(self,keys):
+        for key in filter(lambda x: x in self.clfs.keys(), keys):
+            del self.clfs[key]
+            for col in filter(lambda x: (key in x) and ("_prob_" in x), self.df.columns):
+                del self.df[col]
+    
+
+
     # ---------------------------------------------------------------------------
     def runPrediction(self,target,clf=None,addprobs=True,addval=False):
         
@@ -287,7 +304,7 @@ class EfficiencyFitter(object):
         
         if addprobs:
             column_names = map(lambda x: "%s_prob_%d" % (target,x), xrange(len(clf.classes_)))
-            column_probs = clf. predict_proba(self.df[inputs])
+            column_probs = clf. predict_proba(self.df[inputs].values)
             
             for icol,name in enumerate(column_names):
                 if name in self.df.columns: del self.df[name]
@@ -295,7 +312,7 @@ class EfficiencyFitter(object):
                 
         if addval:
             if "%s_predict" % target in df.columns: del df[df.columns]
-            df["%s_predict" % target] = clf.predict(df[inputs])
+            df["%s_predict" % target] = clf.predict(df[inputs].values)
 
         
     # ---------------------------------------------------------------------------
