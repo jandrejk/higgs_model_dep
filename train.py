@@ -16,9 +16,10 @@ try:
    import cPickle as pickle
 except:
    import pickle
-# import pickle
 
 import itertools
+
+from copy import copy
 
 basedir=""
 
@@ -40,7 +41,6 @@ def set_proc(x):
     
     df['proc'] = np.full(df.index.size,proc,dtype=np.int8)
     
-
 # ---------------------------------------------------------------------------
 def mk_grid_1d(x):
     nbins,xmin,xmax = x
@@ -50,12 +50,14 @@ def mk_grid_1d(x):
     return np.arange(x0,xmax,step)
     
 # ---------------------------------------------------------------------------
-def readRoot(fname,process,treepfx,ncat,genBranches,recoBranches):
-    
+def readRoot(fname,process,treepfx,ncat,genBranches,recoBranches,gentreepfx=None):
+
+    if not gentreepfx:
+       gentreepfx = treepfx
     fname = os.path.join(basedir,fname)
 
     trees = map(lambda x: treepfx+"_SigmaMpTTag_%d" %x, xrange(ncat))
-    gtree = treepfx+"_NoTag_0"
+    gtree = gentreepfx+"_NoTag_0"
     
     dfs = [rpd.read_root(fname,gtree,columns=genBranches)]+map(lambda x: 
                                                                rpd.read_root(fname,x,columns=genBranches+recoBranches), trees )
@@ -63,8 +65,8 @@ def readRoot(fname,process,treepfx,ncat,genBranches,recoBranches):
     map(setclass_and_weight,enumerate(dfs))
     
     df = pd.concat(dfs)
-    if process:
-        set_proc((process,df))
+    if process != None:
+       set_proc((process,df))
     
     return df
 
@@ -145,13 +147,14 @@ class EfficiencyFitter(object):
         self.df = None
         self.split_frac = 0.75
         self.best_params = {}
-
+        self.cv_results = {}
+        
         self.recoBranches = []
         self.genBranches = []
         self.ncats = 0
 
         self.clfs = {}
-        
+
     # ---------------------------------------------------------------------------
     def readData(self,ncats,genBranches,recoBranches,inputs):
         
@@ -169,14 +172,16 @@ class EfficiencyFitter(object):
         
 
     # ---------------------------------------------------------------------------
-    def addData(self,fname,process,treepfx,merge=True):
-        
-        df = readRoot(fname,process,treepfx,self.ncats,self.genBranches,self.recoBranches) 
-        
+    def addData(self,fname,process,treepfx,merge=True,gentreepfx=None):
+       
+        df = readRoot(fname,process,treepfx,self.ncats,self.genBranches,self.recoBranches,
+                      gentreepfx=gentreepfx) 
+
         if type(self.df) != type(None):
-            self.df.append(df)
+           self.df = self.df.append(df)
         else:
-            self.df = df
+           self.df = df
+        print(self.df.index.size)
             
         return self.df
         
@@ -220,11 +225,7 @@ class EfficiencyFitter(object):
         else:
             df = self.df
 
-        ## split_params = kwargs.get('split_params',self.split_params)
         if split:
-            ### if not self.split:
-            ###     self.split = skl.cross_validation.train_test_split(df,**split_params)
-            ###     traindf,testdf = self.split
             split_frac = kwargs.get('split_frac',self.split_frac)
             first_train_evt = int(round(df.index.size*(1.-split_frac)))
             traindf = df[first_train_evt:]
@@ -236,30 +237,36 @@ class EfficiencyFitter(object):
         
         print "cvoptimize", cvoptimize
         if cvoptimize:
-            cv_params_grid = kwargs.get('cv_params_grid')
-            cv_nfolds      = kwargs.get('cv_nfolds')
+            cv_params_grid = kwargs.pop('cv_params_grid')
+            cv_nfolds      = kwargs.pop('cv_nfolds')
+            cv_niter       = kwargs.pop('cv_niter',10)
+            cv_njobs       = kwargs.pop('cv_njobs',16)
+            cv_verbose     = kwargs.pop('cv_verbose',1)
             
-            cvClf = skl.grid_search.RandomizedSearchCV(classifier(**kwargs),cv_params_grid,cv=cv_nfolds)
+            cvClf = skl.model_selection.RandomizedSearchCV(classifier(**kwargs),cv_params_grid,cv=cv_nfolds,refit=True,n_iter=cv_niter,n_jobs=cv_njobs,verbose=cv_verbose)
             
             cvClf.fit(X_train,y_train)
             self.best_params[Ybr] = cvClf.best_params_
-            kwargs.update(cvClf.best_params_)
-            
-        clf = classifier(**kwargs)
-        print(X_train.shape,X_train.size)
-        print(y_train.shape,y_train.size)
-        print(w_train.shape,w_train.size)
-        
-        clf.fit(X_train,y_train,sample_weight=w_train)
+            clf = cvClf.best_estimator_
+            cv_results = copy(cvClf.cv_results_)
+            # MaskedArrays cannot be unpickled
+            update = {}
+            for key, val in cv_results.iteritems():
+               if type(val) == np.ma.core.MaskedArray: update[key] = np.array(val)
+            cv_results.update(update)
+            self.cv_results[Ybr] = cv_results
+        else:
+           clf = classifier(**kwargs)
+           print(X_train.shape,X_train.size)
+           print(y_train.shape,y_train.size)
+           print(w_train.shape,w_train.size)
+           
+           clf.fit(X_train,y_train,sample_weight=w_train)
         clf.inputs = Xbr
-
-        ### if mask != None:
-        ###     self.split = None
         
         self.runPrediction(Ybr,clf,addprobs=addprobs,addval=addval)
             
         return clf
-        
 
     # ---------------------------------------------------------------------------
     def defineBins(self,column,boundaries,overflow=True,underflow=False):
@@ -325,7 +332,7 @@ class EfficiencyFitter(object):
         binColumn,catColumn = self._binColName(column)
         
         if not catColumn in self.df.columns:
-            self.defineBins(column,boundaries)
+            self.defineBins(catColumn,boundaries)
         
         if factorized:
             clf = self.runFit(Xbr,binColumn,'absweight',mask=(self.df['class']>=0),**kwargs)

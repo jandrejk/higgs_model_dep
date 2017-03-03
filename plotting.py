@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from util import target_name
+
 # ---------------------------------------------------------------------------
 def rat_plus_remind(num,den):
     ret = num / den
@@ -95,3 +97,90 @@ def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
     plt.colorbar(cax=cbar_ax,orientation='horizontal')
     
     
+# ---------------------------------------------------------------------------
+def naive_closure(df,column,first=0,logy=False,title=None):
+    target = target_name(column)
+    nstats = np.unique(df[target]).size
+    print(target,nstats)
+    
+    pred_cols = map(lambda x: ("%s_prob_%d" % (target, x)), range(nstats) ) 
+    
+    trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5))[0].ravel()
+    predh = np.array(df[pred_cols].sum(axis=0)).ravel()
+    
+    print(trueh,predh)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    
+    ## true = ax.bar(np.arange(0,2*(nstats),2)[first:],trueh[first:],color='black')
+    ## pred = ax.bar(np.arange(1,2*(nstats)+1,2)[first:],predh[first:],color='red')
+
+    xp = np.arange(nstats)[first:]
+    pred = ax.bar(xp-0.5,predh[first:],color='green',width=1.,alpha=0.5)
+    true = ax.errorbar(xp,trueh[first:],ls='None',
+                       xerr=np.ones_like(xp)*0.5,
+                       yerr=np.sqrt(trueh[first:]),
+                       ecolor='black')
+    plt.xticks(xp,xp)
+    plt.xlabel(column)
+    if title:
+        plt.title(title)
+    
+    if logy:
+        ax.set_yscale('log')
+        
+    plt.legend((true,pred),("true","predicted"),loc='best')
+    
+    plt.show()
+
+# ---------------------------------------------------------------------------
+def control_plots(key,fitter):
+    target = target_name(key)
+    
+    nclasses = len(fitter.clfs[key].classes_)
+    columns = map(lambda x: "%s_prob_%d" % (target,x), xrange(nclasses) )
+    
+    columns = columns[1:]+columns[:1]
+    
+    df = fitter.df
+    if fitter.split_frac > 0:
+        first_train_evt = int(round(df.index.size*(1.-fitter.split_frac)))
+        df = df[:first_train_evt]
+    
+    nrows = nclasses/3+1
+    ncols = 3
+    df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
+     
+    scatter_hist(df,columns,figsize=(28,28))
+    
+    
+    naive_closure(df,key,logy=True,title='All')
+    naive_closure(df,key,first=1,logy=False,title='All')
+    
+    naive_closure(df[df['genPt'] > 50.],key,first=1,logy=False,title='pT > 50')
+
+    naive_closure(df[df['genPt'] < 50.],key,first=1,logy=False,title='pT < 50')
+
+    naive_closure(df[df['absGenRapidity'] > 1.],key,title='|y| > 1.',
+                  first=1,logy=False)
+    naive_closure(df[df['absGenRapidity'] < 1.],key,
+                  title='|y| < 1.',
+                  first=1,logy=False)
+    naive_closure(df[(df['absGenRapidity'] > 1.) & (df['genPt'] > 50.)],key,
+                  title='|y| > 1. & pT > 50',
+                  first=1,logy=False)
+    naive_closure(df[(df['absGenRapidity'] > 1.) & (df['genPt'] < 50.)],key,
+                  title='|y| > 1. & pT < 50',
+                  first=1,logy=False)
+    naive_closure(df[(df['absGenRapidity'] > 0.5) & (df['absGenRapidity'] < 1.) ],key,
+                  title='0.5 < |y| < 1.',
+                  first=1,logy=False)
+    naive_closure(df[df['absGenRapidity'] < 0.5],key,
+                  title='|y| < 0.5',
+                  first=1,logy=False)
+    naive_closure(df[(df['absGenRapidity'] > 0.25) & (df['absGenRapidity'] < .5) ],key,
+                  title='0.25 < |y| < 0.5',
+                  first=1,logy=False)
+    naive_closure(df[df['absGenRapidity'] < 0.25],key,
+                  title='|y| < 0.25',
+                  first=1,logy=False)
