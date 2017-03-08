@@ -13,8 +13,10 @@ def rat_plus_remind(num,den):
 
 # ---------------------------------------------------------------------------
 def scatter_hist(df,columns,cmap=plt.cm.Blues,figsize=(14,8),colorbar=False,
-                 log=False,
-                 **kwargs):
+                 log=False, **kwargs):
+    """
+    This function produces a set of scatter plots.
+    """
     
     ncols = len(columns)
     fig, axarr = plt.subplots(ncols,ncols,figsize=figsize)
@@ -106,14 +108,15 @@ def naive_closure(df,column,first=0,logy=False,title=None):
     target = target_name(column)
     #extract the number of features that belong to column
     nstats = np.unique(df[target]).size
-    print(target,nstats)
+    print("There are " + str(nstats) + " features of type " + str(target))
     
     pred_cols = map(lambda x: ("%s_prob_%d" % (target, x)), range(nstats) ) 
     
     trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5))[0].ravel()
     predh = np.array(df[pred_cols].sum(axis=0)).ravel()
     
-    print(trueh,predh)
+    #This print is not really needed
+    #print(trueh,predh)
     
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -137,6 +140,8 @@ def naive_closure(df,column,first=0,logy=False,title=None):
     plt.xticks(xp,xp)
     plt.xlabel(column)
     
+    plt.ylabel("No. of events")
+    
     if title:
         plt.title(title)
     
@@ -151,7 +156,15 @@ def naive_closure(df,column,first=0,logy=False,title=None):
 
 # ---------------------------------------------------------------------------
 def control_plots(key,fitter):
+    """
+    This function produces a series of plots. First it performs a Box-plot.
+    Then it produces a scatter plot and at the end some histograms with
+    different selection cuts.
     
+    params:   key : string - specifies what type of feature should be 
+                    extracted, e.g. key='class'
+           fitter : train.EfficiencyFitter - trained classifier
+    """
     #goes to util to call target_name. If it is key=class then target=class
     target = target_name(key)
     
@@ -180,7 +193,7 @@ def control_plots(key,fitter):
     
     
     #don't do the box plot and the scatter plot for the moment
-    #df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
+    df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
      
     #scatter_hist(df,columns,figsize=(28,28))
     
