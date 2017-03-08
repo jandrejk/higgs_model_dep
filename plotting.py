@@ -99,7 +99,12 @@ def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
     
 # ---------------------------------------------------------------------------
 def naive_closure(df,column,first=0,logy=False,title=None):
+    
+    #naive_closure(df,column=key,logy=True,title='All')
+    
+    
     target = target_name(column)
+    #extract the number of features that belong to column
     nstats = np.unique(df[target]).size
     print(target,nstats)
     
@@ -109,56 +114,84 @@ def naive_closure(df,column,first=0,logy=False,title=None):
     predh = np.array(df[pred_cols].sum(axis=0)).ravel()
     
     print(trueh,predh)
+    
     fig = plt.figure()
     ax = fig.add_subplot(111)
     
     ## true = ax.bar(np.arange(0,2*(nstats),2)[first:],trueh[first:],color='black')
     ## pred = ax.bar(np.arange(1,2*(nstats)+1,2)[first:],predh[first:],color='red')
 
+    #list of class features, e.g. [0,1,2,3]
     xp = np.arange(nstats)[first:]
-    pred = ax.bar(xp-0.5,predh[first:],color='green',width=1.,alpha=0.5)
+    
+    #pred = ax.bar(xp-0.5,predh[first:],color='green',width=1.,alpha=0.5)
+    """
+    ? Did a change here: removed the shift by 0.5 in the x-axis
+    """
+    pred = ax.bar(xp,predh[first:],color='green',width=1.,alpha=0.5, edgecolor='black')
+    
     true = ax.errorbar(xp,trueh[first:],ls='None',
                        xerr=np.ones_like(xp)*0.5,
                        yerr=np.sqrt(trueh[first:]),
                        ecolor='black')
     plt.xticks(xp,xp)
     plt.xlabel(column)
+    
     if title:
         plt.title(title)
     
     if logy:
         ax.set_yscale('log')
         
-    plt.legend((true,pred),("true","predicted"),loc='best')
+        
+    ax.legend((true,pred),("true","predicted"),bbox_to_anchor=(1.45, 1.))    
+    #plt.legend((true,pred),("true","predicted"),loc='best')
     
     plt.show()
 
 # ---------------------------------------------------------------------------
 def control_plots(key,fitter):
+    
+    #goes to util to call target_name. If it is key=class then target=class
     target = target_name(key)
     
+    #extract the number of classes. fitter.clfs[key].classes_ yields [-1,0,1,2 and datatype]
     nclasses = len(fitter.clfs[key].classes_)
-    columns = map(lambda x: "%s_prob_%d" % (target,x), xrange(nclasses) )
     
+    #map creates new list by applying the inside function to xrange(nclasses)
+    #creates a list of [class_prob_0,...,class_prob3]
+    columns = map(lambda x: "%s_prob_%d" % (target,x), xrange(nclasses) ) 
     columns = columns[1:]+columns[:1]
     
+    #create pandas data frame
     df = fitter.df
+    
+    """
+    ?
+    """
+    #if data set was plitten in train and test set ? take only first few events
     if fitter.split_frac > 0:
         first_train_evt = int(round(df.index.size*(1.-fitter.split_frac)))
         df = df[:first_train_evt]
     
+    #needed for box plot
     nrows = nclasses/3+1
     ncols = 3
-    df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
+    
+    
+    #don't do the box plot and the scatter plot for the moment
+    #df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
      
-    scatter_hist(df,columns,figsize=(28,28))
+    #scatter_hist(df,columns,figsize=(28,28))
     
     
     naive_closure(df,key,logy=True,title='All')
+    
     naive_closure(df,key,first=1,logy=False,title='All')
     
     naive_closure(df[df['genPt'] > 50.],key,first=1,logy=False,title='pT > 50')
 
+    """
     naive_closure(df[df['genPt'] < 50.],key,first=1,logy=False,title='pT < 50')
 
     naive_closure(df[df['absGenRapidity'] > 1.],key,title='|y| > 1.',
@@ -184,3 +217,4 @@ def control_plots(key,fitter):
     naive_closure(df[df['absGenRapidity'] < 0.25],key,
                   title='|y| < 0.25',
                   first=1,logy=False)
+    """
