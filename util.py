@@ -11,6 +11,61 @@ params = {}
 
 # -------------------------------------------------------------------------------------
 def defaultParameters(**kwargs):
+    """
+    This function is used to set up parameters such as the directory where the root 
+    files are located, the branches which will be read from the root trees and so 
+    forth.
+    : params      
+            dataDir : string - specifies the directory of the data. (default =   
+                      root://t3dcachedb03.psi.ch//pnfs/psi.ch/cms/trivcat/store
+                      /user/musella/mod_dep_005")
+          dataFname : string - specifies the file name of the root file inside
+                      the directory dataDir. (default = "output_InsideAcceptance
+                      _125.root")
+                pfx : string - specifies the prefix going from the root data file
+                      name dataFname down to the branches of the different classes.
+                      The classes are NoTag_0, SigmaMpTTag_0, SigmaMpTTag_1 and 
+                      SigmaMpTTag_2. (default =  "genDiphotonDumper/trees
+                      /InsideAcceptance_125_13TeV")
+           inputDir : string - specifis the directory of the classifier in case
+                      one is going to load a classifier. (default = ".")
+          inputName : string - specifies the name of the classifier fitted.
+                      (default = "effFitter")
+             outDir : string - specifis the directory where the classifier is
+                      stored. (default = ".")
+            outName : string - specifies the name of the classifier when saved in
+                      outDir. (default = "effFitter_out")
+              ncats : int - specifies the number of categories. (default = 3)
+        genBranches : list - specifies the branches of generated events.
+                      (default = ["genPt","genRapidity",
+                             "genJet2p5Pt0","genJet2p5Rapidity0",
+                             "genJet2p5Pt1","genJet2p5Rapidity1",
+                             "genJet2p5Pt2","genJet2p5Rapidity2",
+                             "genJet2p5Pt3","genJet2p5Rapidity3",
+                             "weight",
+                             "genNjets2p5"
+                         ])
+       recoBranches : list - specifies the branches of reconstructed events.
+                      (default = ['recoPt','recoRapidity',"recoNjets2p5"])
+            rndseed : int =  9347865 - specifies the starting point of the random 
+                      number seed. Needed for shuffling. 
+          rndseed 2 : int = 2315645 - see rndseed for explanantion.
+         split_frac : float - specifies the amount of data that will be used for
+                      the training. (default = 0.75 i.e. 75% of the data is used
+                      for training)
+               load : boolean - specifies whether to load an already trained 
+                      classifier (True) or generate a new one (False).
+                      (default = True)
+          forceMake : boolean - specifies whether to force to generate a new 
+                      classifier instance.
+              clean : 
+        classifiers : string - specifies the type of machine learning technique
+                      you want to apply, e.g. class for classification.
+                      (default = [])
+         defineBins : 
+    : retruns 
+                    :
+    """
     global params
     
     params["dataDir"]="root://t3dcachedb03.psi.ch//pnfs/psi.ch/cms/trivcat/store/user/musella/mod_dep_005"
@@ -43,6 +98,8 @@ def defaultParameters(**kwargs):
     params["clean"] = []
     
     params["classifiers"] = []
+
+    params["defineBins"] = {}
     
     params.update(kwargs)
     
@@ -159,6 +216,7 @@ def runTraining(effFitter):
     global params
     to_train = filter(lambda x: x not in effFitter.clfs.keys(), params["classifiers"])
 
+    print("We need to train the following classifiers %s" % " ".join(to_train) )
     for key in to_train:
         classifier,train_params = params[key]
         pack,cls = classifier.rsplit('.',1)
