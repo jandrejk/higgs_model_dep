@@ -16,39 +16,77 @@ def scatter_hist(df,columns,cmap=plt.cm.Blues,figsize=(14,8),colorbar=False,
                  log=False, **kwargs):
     """
     This function produces a set of scatter plots.
+    : params 
+             df : pandas dataframe - specifies 
+        columns :
+           cmap :
+        figsize :
+       colorbar :
+            log :
+    : retruns 
+                :
     """
     
+    #extract the number of columns and initialize a figure with
+    #sqaure size ncols x ncols
     ncols = len(columns)
     fig, axarr = plt.subplots(ncols,ncols,figsize=figsize)
+    
     
     for ix,xcol in enumerate(columns):        
         xargs = {}
         if type(xcol) == tuple: 
             xcol, xargs = xcol
-        xlabel = "cat "+xargs.get('xlabel',xcol.split("_")[-1])
+        xlabel = "prob "+"cat "+xargs.get('xlabel',xcol.split("_")[-1])
         for iy,ycol in enumerate(columns):
-            histargs = { "bins" : 20 } #, "normed" : True, "log" : log }
+            histargs = { "bins" : 20, "edgecolor" : 'black', "color" : "red" } #, "normed" : True, "log" : log }
             histargs.update(xargs)
             yargs = {}
             if type(ycol) == tuple: 
                 ycol,yargs = ycol
-            ylabel = "cat "+yargs.get('ylabel',ycol.split("_")[-1])
+            ylabel = "prob "+"cat "+yargs.get('ylabel',ycol.split("_")[-1])
             if iy == ix:
-                axarr[ix,iy].hist(df[xcol],weights=df['weight'],**histargs)
+                axarr[ix,iy].hist(df[xcol],weights=df['weight'], **histargs)
             else:
                 axarr[iy,ix].hexbin(x=df[xcol],y=df[ycol],C=df['weight'],cmap=cmap)
                 if colorbar: plt.colorbar(ax=axarr[iy,ix])
+                    
             if ix == 0:
                 axarr[iy,ix].set_ylabel(ylabel)
             else:
-                plt.setp(axarr[iy,ix].get_yticklabels(), visible=False)                
+                plt.setp(axarr[iy,ix].get_yticklabels())#, visible=False)                
             if iy == ncols-1:
                 axarr[iy,ix].set_xlabel(xlabel)
             else:
                 plt.setp(axarr[iy,ix].get_xticklabels(), visible=False)
                 
     plt.show()
-
+    
+    
+    
+    figsize = map(lambda x : x/3, figsize)
+    fig2, ax = plt.subplots(ncols/2,ncols/2, figsize=figsize)
+    
+    for i,col in enumerate(columns):        
+        args = {}
+        if type(col) == tuple: 
+            col, args = col
+        xlabel = "prob "+"cat "+args.get('xlabel',col.split("_")[-1])
+        ylabel = "weighted count" 
+        histarg = { "bins" : 20, "edgecolor" : 'black', "color" : "red" }
+        histarg.update(args)
+        
+        #indices in the subplots
+        k = i/2
+        l = i%2
+        
+        ax[k,l].hist(df[col],weights=df['weight'], **histarg)
+        ax[k,l].set_xlabel(xlabel)
+        if l == 0:
+            ax[k,l].set_ylabel(ylabel)      
+        
+    fig2.tight_layout()        
+    plt.show()
 # ---------------------------------------------------------------------------
 def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
                    xlabel=None,ylabel=None,**kwargs):
@@ -154,14 +192,16 @@ def naive_closure(df,column,first=0,logy=False,title=None):
     
     plt.show()
 
+    
 # ---------------------------------------------------------------------------
 def control_plots(key,fitter):
     """
-    This function produces a series of plots. First it performs a Box-plot.
+    This function produces a series of plots. First it performs a box plot.
     Then it produces a scatter plot and at the end some histograms with
     different selection cuts.
     
-    params:   key : string - specifies what type of feature should be 
+    : params   
+              key : string - specifies what type of feature should be 
                     extracted, e.g. key='class'
            fitter : train.EfficiencyFitter - trained classifier
     """
@@ -172,39 +212,38 @@ def control_plots(key,fitter):
     nclasses = len(fitter.clfs[key].classes_)
     
     #map creates new list by applying the inside function to xrange(nclasses)
-    #creates a list of [class_prob_0,...,class_prob3]
+    #creates a list of [class_prob_0,...,class_prob_3]
     columns = map(lambda x: "%s_prob_%d" % (target,x), xrange(nclasses) ) 
-    columns = columns[1:]+columns[:1]
+    columns = columns[:1]+columns[1:]
     
     #create pandas data frame
     df = fitter.df
-    
-    """
-    ?
-    """
-    #if data set was plitten in train and test set ? take only first few events
+    #if data set was splitten in train and test set then take only the test set.
+    #note that the test set is indexed from 0 to first_train_evt
     if fitter.split_frac > 0:
         first_train_evt = int(round(df.index.size*(1.-fitter.split_frac)))
         df = df[:first_train_evt]
     
+    print(first_train_evt)
     #needed for box plot
-    nrows = nclasses/3+1
-    ncols = 3
+    nrows = nclasses/3+1 #would not work in python 3
+    ncols = 3  
+    #perform the box plot
+    #df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
+       
+        
+    #perform the scatter plots
+    scatter_hist(df,columns,figsize=(28,28))
     
     
-    #don't do the box plot and the scatter plot for the moment
-    df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
-     
-    #scatter_hist(df,columns,figsize=(28,28))
-    
-    
+    """
     naive_closure(df,key,logy=True,title='All')
     
     naive_closure(df,key,first=1,logy=False,title='All')
     
     naive_closure(df[df['genPt'] > 50.],key,first=1,logy=False,title='pT > 50')
 
-    """
+    
     naive_closure(df[df['genPt'] < 50.],key,first=1,logy=False,title='pT < 50')
 
     naive_closure(df[df['absGenRapidity'] > 1.],key,title='|y| > 1.',
