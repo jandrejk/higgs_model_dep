@@ -7,6 +7,15 @@ from util import target_name
 
 # ---------------------------------------------------------------------------
 def rat_plus_remind(num,den):
+    """
+    This function returns the value of the ratio num : den rounded up
+    to the next integer.
+    :params 
+            num : int - numerator
+            den : int - denominator
+    :retruns
+            ret : int - num/den rounded up
+    """
     ret = num / den
     if num % den > 0: ret+=1
     return ret
@@ -17,12 +26,18 @@ def scatter_hist(df,columns,cmap=plt.cm.Blues,figsize=(14,8),colorbar=False,
     """
     This function produces a set of scatter plots.
     : params 
-             df : pandas dataframe - specifies 
-        columns :
-           cmap :
-        figsize :
-       colorbar :
-            log :
+             df : pandas dataframe - includes the tabulated properties
+                  of the classifier
+        columns : list, string - specifies which columns in the dataframe
+                  should be plotted against each other.  
+           cmap : 
+        figsize : tuple, int - specifies the figure size. (default: 
+                  figsize=(14,8))
+       colorbar : boolean - specifies whether to display the colorbar
+                  (True) or not (False). (default=False)
+            log : boolean - specifies whether to display the scatter
+                  plot in logarithmic scale (True) or not (False). 
+                  (default=False)
     : retruns 
                 :
     """
@@ -87,12 +102,36 @@ def scatter_hist(df,columns,cmap=plt.cm.Blues,figsize=(14,8),colorbar=False,
         
     fig2.tight_layout()        
     plt.show()
+    
 # ---------------------------------------------------------------------------
 def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
                    xlabel=None,ylabel=None,**kwargs):
-    
+    """
+    This function produces efficiency plots for all the categories.
+    : params 
+            x : numpy.ndarry - specifies the x bins of the of the
+                2d histogram.
+            y : numpy.ndarry - specifies the corresponding y bins of the of 
+                the 2d histogram.
+            z : numpy.ndarray - specifiec the efficiency/probability of each
+                category to be ploted.
+         cmap : colormap style
+       layout : tuple - specifies the number of rows and columns of the plot
+                (default: layout=None)
+       xlabel : string - specifies the label of the x-axis (default: 
+                xlabel=None)
+       ylabel : string - specifies the label of the y-axis (default: 
+                ylabel=None)
+            
+    """
+    #initilize a figure. kwargs are e.g. figsize
     fig = plt.figure(**kwargs)
+    #extract the number of categories
     nplots = z[0].size
+    
+    #This block of code is used in order to find out the number of rows
+    #and columns in case no specific layout is given.
+    #-----------------------------------------------
     if not layout:
         for ncols in xrange(1,nplots):
             nrows = rat_plus_remind(nplots,ncols)
@@ -104,13 +143,18 @@ def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
         if not ncols:
             ncols = rat_plus_remind(nplots,nrows)
     ## layout=(nrows,ncols)
+    #-----------------------------------------------
     
     for icat in xrange(1,nplots):
+        #row and column index
         irow = (icat-1) / ncols
         icol = (icat-1) % ncols
+
         ## ax = axarr[irow,icol]
         ax = plt.subplot(nrows, ncols, icat)
         plt.hexbin(x=x,y=y,C=z[:,icat],cmap=cmap,vmin=0,vmax=1)
+        
+        #editing the plots when to show which label
         if icol == 0: 
             if ylabel: plt.ylabel(ylabel)
         else:
@@ -124,9 +168,10 @@ def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
         ## if icol == ncols - 1: plt.colorbar()
         
     plt.subplot(nrows, ncols, nplots)
+    
+    #1. - not_reco = efficiency
     plt.hexbin(x=x,y=y,C=1.-z[:,0],cmap=cmap,vmin=0,vmax=1)
-    if (nplots % (nrows-1) == 1): 
-        plt.ylabel(ylabel)
+    if (nplots % (ncols) == 1): plt.ylabel(ylabel)
     else: 
         plt.setp(ax.get_yticklabels(), visible=False)
     if xlabel: plt.xlabel(xlabel)
@@ -139,6 +184,25 @@ def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
     
 # ---------------------------------------------------------------------------
 def naive_closure(df,column,first=0,logy=False,title=None):
+    """
+    This function produces 1d histograms ensuring the in this case the
+    BDT gives comparable results to simply counting the events.
+    :params 
+             df : pandas dataframe - includes the tabulated properties
+                  of the classifier
+         column : list, string - specifies which columns in the dataframe
+                  should be plotted against each other.  
+          first : int - specifies from which category on the histogram
+                  should be produced. This can be used to omit the first
+                  class of not reconstructed events by setting first=1
+                  (default: first=0)
+           logy : boolean - specifies whether the histogram should have a 
+                  logarithmic y-axis (True) or not (False).
+                  (default: logy=False)
+          title : string - specifies the title of the histogram (default: 
+                  title = None)
+    
+    """
     
     #naive_closure(df,column=key,logy=True,title='All')
     
@@ -150,7 +214,12 @@ def naive_closure(df,column,first=0,logy=False,title=None):
     
     pred_cols = map(lambda x: ("%s_prob_%d" % (target, x)), range(nstats) ) 
     
+    print(pred_cols)
+    
+    #the outcome of trueh is an int
     trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5))[0].ravel()
+    #the predicted hist sums over all events weighted by their probability
+    #hence the result is a float
     predh = np.array(df[pred_cols].sum(axis=0)).ravel()
     
     #This print is not really needed
@@ -224,26 +293,24 @@ def control_plots(key,fitter):
         first_train_evt = int(round(df.index.size*(1.-fitter.split_frac)))
         df = df[:first_train_evt]
     
-    print(first_train_evt)
     #needed for box plot
     nrows = nclasses/3+1 #would not work in python 3
     ncols = 3  
     #perform the box plot
-    #df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
+    df.boxplot(by=target,column=columns,figsize=(7*ncols,7*nrows),layout=(nrows,ncols))
        
         
     #perform the scatter plots
     scatter_hist(df,columns,figsize=(28,28))
     
     
-    """
+    
     naive_closure(df,key,logy=True,title='All')
     
     naive_closure(df,key,first=1,logy=False,title='All')
     
     naive_closure(df[df['genPt'] > 50.],key,first=1,logy=False,title='pT > 50')
 
-    
     naive_closure(df[df['genPt'] < 50.],key,first=1,logy=False,title='pT < 50')
 
     naive_closure(df[df['absGenRapidity'] > 1.],key,title='|y| > 1.',
@@ -269,4 +336,4 @@ def control_plots(key,fitter):
     naive_closure(df[df['absGenRapidity'] < 0.25],key,
                   title='|y| < 0.25',
                   first=1,logy=False)
-    """
+  
