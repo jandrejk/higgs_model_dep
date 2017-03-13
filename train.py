@@ -157,7 +157,6 @@ class EfficiencyFitter(object):
 
     # ---------------------------------------------------------------------------
     def readData(self,ncats,genBranches,recoBranches,inputs):
-        
         self.genBranches,self.recoBranches=genBranches,recoBranches
         self.ncats = ncats
         
@@ -181,7 +180,8 @@ class EfficiencyFitter(object):
            self.df = self.df.append(df)
         else:
            self.df = df
-        print(self.df.index.size)
+        
+        print("The number of selected events are " + str(self.df.index.size))
             
         return self.df
         
@@ -245,6 +245,7 @@ class EfficiencyFitter(object):
             
             cvClf = skl.model_selection.RandomizedSearchCV(classifier(**kwargs),cv_params_grid,cv=cv_nfolds,refit=True,n_iter=cv_niter,n_jobs=cv_njobs,verbose=cv_verbose)
             
+            
             cvClf.fit(X_train,y_train)
             self.best_params[Ybr] = cvClf.best_params_
             clf = cvClf.best_estimator_
@@ -260,6 +261,11 @@ class EfficiencyFitter(object):
            print(X_train.shape,X_train.size)
            print(y_train.shape,y_train.size)
            print(w_train.shape,w_train.size)
+          
+           print(X_train[0:3])
+           print(y_train[0:3])
+           print(w_train[0:3])
+                    
            
            clf.fit(X_train,y_train,sample_weight=w_train)
         clf.inputs = Xbr

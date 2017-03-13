@@ -108,27 +108,56 @@ def defaultParameters(**kwargs):
 def setParams(default=None,config_files=None):
     global params 
     if default:
+        print('entered default')
         params = copy(default)
     
     if not config_files:
+        print('entered config files named my_train_config')
         config_files = os.environ.get('my_train_config',None)
+        print(config_files)
 
     if config_files:
+        print('load some params')
         for cfg in config_files.split(','):
             print("reading %s" % cfg)
             with open(cfg) as fin: 
                 loadparams = json.loads(fin.read())
                 params.update(loadparams)
 
+                
+                
 # -------------------------------------------------------------------------------------
 def loadOrMake():
-
+    """
+    This function loads or makes an object from the class EfficiencyFitter from 
+    train.py and retruns it.
+    :params   
+               :
+    retruns    
+          made : train.EfficiencyFitter - instance of the class EfficiencyFitter
+    """
     global params
-    pprint(params)
-
+    
     name = params["inputName"]
     load = params["load"]
     forceMake = params["forceMake"]
+    
+    
+    
+    #need some talking of the code :-)
+    #++++++++++++++++++++++++++++++++++++++++++++
+    if forceMake : 
+        print("Forced production of an object with the name "+str(name) 
+                        + " and the following paramters ") 
+    else :
+        if load :
+            print("Load object with the name "+str(name) 
+                        + " and the following paramters ") 
+        else :
+            print("Create object with the name "+str(name) 
+                        + " and the following paramters ") 
+    pprint(params)
+    #++++++++++++++++++++++++++++++++++++++++++++
     
     make = False
     if load:
@@ -147,10 +176,11 @@ def loadOrMake():
 
     if make or forceMake:
         if not load:
+            #Initialize an instance of the class EfficiencyFitter
             made = tn.EfficiencyFitter(name)
         else:
             made = onDisk
-
+          
         files = params.get("dataFiles",[])
         if len(files) == 0:
             files.append( (0,params["dataFname"]) )
@@ -158,12 +188,16 @@ def loadOrMake():
                     ifil[0],params["pfx"] if len(ifil)<3 else ifil[2],True,
                     params.get("genpfx",None) if len(ifil)<4 else ifil[3] )
                    for ifil in files ]
+        
+        #generates a pandas data frame in train.py which loads the appropriate
+        #branchens from the root tree
         made.readData(params["ncats"],params["genBranches"],params["recoBranches"],
                       inputs)
         ## fileName = os.path.join(params["dataDir"],params["dataFname"])
         ## made.readData(params["ncats"],params["genBranches"],params["recoBranches"],
         ##               [(fileName,None,params["pfx"])])
         
+        #shuffles dataset and orders according this random indices
         print('shuffling dataset')
         np.random.seed(params['rndseed'])
         made.df['random_index'] = np.random.permutation(range(made.df.index.size))
@@ -184,6 +218,7 @@ def loadOrMake():
     made.outdir = params["outDir"]
     made.name = params["outName"]
     return made
+    
 
 # -------------------------------------------------------------------------------------
 def setupJoblib(ipp_profile='default'):
