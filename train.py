@@ -96,12 +96,14 @@ class IO(object):
     @staticmethod
     def save(obj,nodata=False):
         fname = os.path.join(obj.outdir,obj.name)+'.pkl.gz'
+        print(fname)
+        
         with gopen(fname,'w+') as fout:
             pickle.dump(obj,fout)
             fout.close()
         if not nodata:
             IO.saveData(obj)
-
+        
     # ---------------------------------------------------------------------------
     @staticmethod
     def load(name,path='.',nodata=False):
@@ -219,6 +221,9 @@ class EfficiencyFitter(object):
                trainevts=-1,mask=None,
                **kwargs):
         
+        print(Xbr)
+        print(Ybr)
+        
         if mask != None:
             self.split = None
             df = self.df[mask]
@@ -270,6 +275,13 @@ class EfficiencyFitter(object):
            clf.fit(X_train,y_train,sample_weight=w_train)
         clf.inputs = Xbr
         
+        
+        """
+        add here variable importances
+        """
+        
+        
+        #after the training run the prediction imeediatelly afterwards
         self.runPrediction(Ybr,clf,addprobs=addprobs,addval=addval)
             
         return clf
