@@ -107,7 +107,10 @@ class IO(object):
     # ---------------------------------------------------------------------------
     @staticmethod
     def load(name,path='.',nodata=False):
+        print(path)
         fname = os.path.join(path,name)+'.pkl.gz'
+        print fname
+        
         with gopen(fname,'r') as fin:
             print("loading pickle %s" % fname)
             obj = pickle.load(fin)
@@ -119,7 +122,7 @@ class IO(object):
             obj.df = IO.loadData(dname)
         
         return IO.reload(obj)
-    
+        
     # ---------------------------------------------------------------------------
     @staticmethod
     def saveClf(obj,column='class'):
@@ -205,13 +208,25 @@ class EfficiencyFitter(object):
         clf = self.clfs[column]
         inputs = clf.inputs
         
+        
         if type(grid) == list:
             axes = map(mk_grid_1d,grid)
+            #print(axes)
             grid = np.array(list(itertools.product(*axes)))
+        
         
         # X = grid if conditional == None else np.hstack([grid,conditional])
         probs = clf.predict_proba(grid)
+      
         return grid,probs
+    
+    # ---------------------------------------------------------------------------    
+    def featureImportance(self, column) :
+        clf = self.clfs[column]
+        inputs = clf.inputs
+        inputs_importance =clf.feature_importances_
+        
+        return inputs, inputs_importance
         
     # ---------------------------------------------------------------------------
     def runFit(self,Xbr,Ybr,wbr='absweight',
@@ -275,11 +290,7 @@ class EfficiencyFitter(object):
            clf.fit(X_train,y_train,sample_weight=w_train)
         clf.inputs = Xbr
         
-        
-        """
-        add here variable importances
-        """
-        
+                
         
         #after the training run the prediction imeediatelly afterwards
         self.runPrediction(Ybr,clf,addprobs=addprobs,addval=addval)
