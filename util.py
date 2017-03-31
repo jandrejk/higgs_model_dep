@@ -156,7 +156,7 @@ def loadOrMake():
         else :
             print("Create object with the name "+str(name) 
                         + " and the following paramters ") 
-    pprint(params)
+    #pprint(params)
     #++++++++++++++++++++++++++++++++++++++++++++
     
     make = False
@@ -208,6 +208,15 @@ def loadOrMake():
         print('defining bins')
         if 'genRapidity' in made.df.columns and ( not 'absGenRapidity' in made.df.columns ):
             made.df['absGenRapidity'] = np.abs(made.df['genRapidity'])
+        # fold also the rapidity space of the jets, i.e. only care about absolut values of
+        # jet rapidities
+        JetRapidityNames = ['genJet2p5Rapidity0','genJet2p5Rapidity1',
+                            'genJet2p5Rapidity2','genJet2p5Rapidity3']
+        for jetRapName in JetRapidityNames :
+            #replace gen with absGen (mind the capital G)
+            if jetRapName in made.df.columns and ( not 'abs'+'G'+jetRapName[1:] in made.df.columns ):
+                made.df['abs'+'G'+jetRapName[1:]] = np.abs(made.df[jetRapName])
+        
         runDefineBins(made,params["defineBins"])
         
     else:

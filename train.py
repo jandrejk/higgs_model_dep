@@ -210,8 +210,6 @@ class EfficiencyFitter(object):
         
         
         if type(grid) == list:
-            axes = map(mk_grid_1d,grid)
-            #print(axes)
             grid = np.array(list(itertools.product(*axes)))
         
         
@@ -227,7 +225,21 @@ class EfficiencyFitter(object):
         inputs_importance =clf.feature_importances_
         
         return inputs, inputs_importance
+    
+    def ClassPrediction(self, column, Xbr, **kwargs) :
+        df = self.df
+        clf = self.clfs[column]
+        split_frac = kwargs.get('split_frac',self.split_frac)
+        print(split_frac)
+        first_train_evt = int(round(df.index.size*(1.-split_frac)))
+        testdf = df[:first_train_evt]
         
+        
+        X_test = testdf[Xbr].values
+        
+        y_pred = clf.predict(X_test)
+        
+        return y_pred
     # ---------------------------------------------------------------------------
     def runFit(self,Xbr,Ybr,wbr='absweight',
                cvoptimize=False,split=True,               
