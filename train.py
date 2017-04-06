@@ -317,12 +317,17 @@ class EfficiencyFitter(object):
         colmin = self.df[column].min()
         colmax = self.df[column].max()
         
+        
         if overflow:
-            boundaries.append(colmax)
+            if (colmax > boundaries[-1]) :
+                boundaries = np.append(boundaries,colmax)
+                #print('appending overflow')
         if underflow:
             boundaries.insert(0,colmin)
 
         labels = xrange(len(boundaries)-1)
+        
+        #print(boundaries)
         
         if binColumn in self.df.columns: del self.df[binColumn]
         self.df[binColumn] = pd.cut(self.df[column],bins=boundaries,labels=labels)

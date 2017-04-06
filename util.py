@@ -7,6 +7,8 @@ import numpy as np
 
 from copy import copy
 
+import json
+
 params = {}
 
 # -------------------------------------------------------------------------------------
@@ -245,10 +247,10 @@ def setupJoblib(ipp_profile='default'):
 
 # -------------------------------------------------------------------------------------
 def runDefineBins(fitter,binsDef):
-    for name,params in binsDef.iteritems(): fitter.defineBins(name,**params)
-
-
-# -------------------------------------------------------------------------------------
+    for name,params in binsDef.iteritems(): 
+        boundaries = fitter.defineBins(name,**params)
+       
+#--------------------------------------------------------------------------------------
 def target_name(key):
     postFix = ""
     if key != 'class':

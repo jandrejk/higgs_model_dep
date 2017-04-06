@@ -134,6 +134,7 @@ def GetDictionary (inputDir) :
                 classifier_names.append(names[:-7])
         if (classifier_names != []) :
             classifier_dictionary = dict(zip(classifier_names,classifier_names))
+            print("classifiers found")
             return classifier_dictionary, inputDir;
         else : 
             print('No classifiers in directory '+inputDir)
