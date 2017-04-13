@@ -86,7 +86,9 @@ def defaultParameters(**kwargs):
                              "genJet2p5Pt2","genJet2p5Rapidity2",
                              "genJet2p5Pt3","genJet2p5Rapidity3",
                              "weight",
-                             "genNjets2p5"
+                             "genNjets2p5",
+                             'genLeadGenIso',
+                             'genSubleadGenIso'
                          ]
     params["recoBranches"] = ['recoPt','recoRapidity',"recoNjets2p5"]
 

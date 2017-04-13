@@ -197,7 +197,7 @@ class EfficiencyFitter(object):
         if not 'absGenRapidity' in self.df.columns:
             self.df['absGenRapidity'] = np.abs(self.df['genRapidity'])
         
-        Xbr = ['genPt','absGenRapidity']
+        Xbr = ['genPt','absGenRapidity','genLeadGenIso','genSubleadGenIso']
         self.clfs['class'] = self.runFit(Xbr,'class','absweight',**kwargs)
         
         return self.clfs['class']

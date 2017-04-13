@@ -4,6 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from util import target_name
+from scipy.stats import skellam
+
+import os 
 
 # ---------------------------------------------------------------------------
 def rat_plus_remind(num,den):
@@ -183,7 +186,8 @@ def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
     
     
 # ---------------------------------------------------------------------------
-def naive_closure(df,column,first=0,logy=False,title=None):
+def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
+                 savepath = None):
     """
     This function produces 1d histograms ensuring the in this case the
     BDT gives comparable results to simply counting the events.
@@ -201,6 +205,11 @@ def naive_closure(df,column,first=0,logy=False,title=None):
                   (default: logy=False)
           title : string - specifies the title of the histogram (default: 
                   title = None)
+       absolute : boolean - specifies whether the histogram is filled witout
+                  weights (True) are with weights (True). Note that for 
+                  weighted histograms the skellam distribution gives an 
+                  estimate on the uncertainties of the true histogram.
+                  (default: absolute=True)
     
     """
     
@@ -216,15 +225,50 @@ def naive_closure(df,column,first=0,logy=False,title=None):
     
     print(pred_cols)
     
-    #the outcome of trueh is an int
-    trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5))[0].ravel()
-    #the predicted hist sums over all events weighted by their probability
-    #hence the result is a float
-    predh = np.array(df[pred_cols].sum(axis=0)).ravel()
     
-    #This print is not really needed
-    #print(trueh,predh)
+    if absolute :
+        # fill the histograms without weights. The error on the number
+        # of events in a bin are driven by a Poissonian
+        
+        #the outcome of trueh is an int
+        trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5))[0].ravel() 
+        #the predicted hist sums over all events weighted by their probability
+        #hence the result is a float
+        predh = np.array((df[pred_cols]).sum(axis=0)).ravel()
     
+    else :
+        # here the weights are taken into account. In order to estimate the 
+        # uncertaintiy on the weighted number of events the skellam dist function
+        # from scipy is used.
+        
+        sum_of_weights = df['weight'].sum()
+        #the outcome of trueh is an int
+        trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=df['weight'])[0].ravel() / sum_of_weights
+        
+        
+        # no of positive weight events
+        mu_1 = df[df['weight']>0].groupby(target).count()['weight'].values
+        # no of negative weight events
+        mu_2 = df[df['weight']<0].groupby(target).count()['weight'].values
+        
+        # take the mean of the absolute weights as an approximate multiplication
+        # factor for the average detector eff and lumi-factor correction.
+        avg_absweight = df[['absweight',target]].groupby(target).agg(np.mean).values.ravel()   
+        
+        
+        N_est_evts = np.multiply((mu_1-mu_2),avg_absweight) 
+        
+        
+        err_pos = +np.multiply(skellam.ppf(1.-0.16, mu_1, mu_2),avg_absweight) - N_est_evts
+        err_neg = -np.multiply(skellam.ppf(0.16, mu_1, mu_2),avg_absweight)    + N_est_evts
+        err_pos = err_pos / sum_of_weights
+        err_neg = err_neg / sum_of_weights
+        
+        predh = []
+        for c in pred_cols :
+            predh.append(weighted_average(df,c,'weight'))
+        
+
     fig = plt.figure()
     ax = fig.add_subplot(111)
     
@@ -235,19 +279,27 @@ def naive_closure(df,column,first=0,logy=False,title=None):
     xp = np.arange(nstats)[first:]
     
     #pred = ax.bar(xp-0.5,predh[first:],color='green',width=1.,alpha=0.5)
-    """
-    ? Did a change here: removed the shift by 0.5 in the x-axis
-    """
-    pred = ax.bar(xp,predh[first:],color='green',width=1.,alpha=0.5, edgecolor='black')
+    pred = ax.bar(xp-.5,predh[first:],color='green',width=1.,alpha=0.5, edgecolor='black')
     
-    true = ax.errorbar(xp,trueh[first:],ls='None',
+    if absolute :
+        true = ax.errorbar(xp,trueh[first:],ls='None',
                        xerr=np.ones_like(xp)*0.5,
                        yerr=np.sqrt(trueh[first:]),
                        ecolor='black')
+        plt.ylabel("No. of events")
+    
+    else :
+        true = ax.errorbar(xp,trueh[first:],ls='None',
+                        xerr=np.ones_like(xp)*0.5,
+                        yerr=[abs(err_neg)[first:],err_pos[first:]],#np.sqrt(trueh[first:]),
+                        ecolor='black')
+        plt.ylabel("No. of events (weighted)")
+    
+    
     plt.xticks(xp,xp)
     plt.xlabel(column)
     
-    plt.ylabel("No. of events")
+    plt.ylabel("No. of events (weighted)")
     
     if title:
         plt.title(title)
@@ -256,11 +308,45 @@ def naive_closure(df,column,first=0,logy=False,title=None):
         ax.set_yscale('log')
         
         
-    ax.legend((true,pred),("true","predicted"),bbox_to_anchor=(1.45, 1.))    
-    #plt.legend((true,pred),("true","predicted"),loc='best')
+    #ax.legend((true,pred),("true","predicted"),bbox_to_anchor=(1.45, 1.))    
+    plt.legend((true,pred),("true","predicted"),loc='best')
     
-    plt.show()
+    if (savepath != None) :
+        try :
+            plt.savefig(savepath+'/'+title)
+        except IOError :
+            os.mkdir(savepath)
+            plt.savefig(savepath+'/'+title)
+      
+    else :
+        plt.show()
+    
 
+def weighted_average(df_name, column_name, weight_name=None):
+    """
+        This function computes the weighted average of the quantity column_name
+        stared in the pandas dataframe df_name. In case no weights are given
+        or if they sum up to zero, the mean is returned instead.
+        :params 
+                df_name :
+            column_name :
+            weight_name :
+        :retruns
+                        :
+        """
+    #----------------------------------------------------------------------------
+    d = df_name[column_name]
+    
+    if (weight_name == None) :
+        return float(d.mean())
+    else :
+        try:
+            w = df_name[weight_name]
+            return (d * w).sum() / float(w.sum())
+        except ZeroDivisionError:
+            return float(d.mean())
+    #----------------------------------------------------------------------------
+    
     
 # ---------------------------------------------------------------------------
 def control_plots(key,fitter):

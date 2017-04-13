@@ -92,6 +92,13 @@ def defaultWidgets (**kwargs) :
         description='detector efficiency',
         disabled=False
         )
+    
+    widgetparams['w_prodProc'] = widgets.SelectMultiple(
+    options={'ggF':0,'ttH':1,'VBF':2,'VH':3},
+    #value=['ggF','ttH','VBF','VH'],
+    description='production process',
+    disabled=False
+    )
 
 
 def GetFitter ( dataDir, inputName, 
@@ -149,20 +156,20 @@ def GetBins (x_pt, y_pt, x_name, y_name) :
     N_PtBins = 8
     N_RapidityBins = 8
     if (x_pt and y_pt) :
-        return { x_name : dict(boundaries=np.linspace(-0.1,300.,N_PtBins)), 
-                y_name : dict(boundaries=np.linspace(-0.1,300.,N_PtBins))
+        return { x_name : dict(boundaries=np.linspace(0.,300.,N_PtBins)), 
+                y_name : dict(boundaries=np.linspace(0.,300.,N_PtBins))
                }   
     else :
         if x_pt :
-            return { x_name : dict(boundaries=np.linspace(-0.1,300.,N_PtBins)), 
-                    y_name : dict(boundaries=np.linspace(-0.1,2.5,N_RapidityBins))
+            return { x_name : dict(boundaries=np.linspace(0.,300.,N_PtBins)), 
+                    y_name : dict(boundaries=np.linspace(0.,2.5,N_RapidityBins))
                    }
         if y_pt :
-            return { x_name : dict(boundaries=np.linspace(-0.1,2.5,N_RapidityBins)), 
-                    y_name : dict(boundaries=np.linspace(-0.1,300.,N_PtBins))
+            return { x_name : dict(boundaries=np.linspace(0.,2.5,N_RapidityBins)), 
+                    y_name : dict(boundaries=np.linspace(0.,300.,N_PtBins))
                    }
-        return { x_name : dict(boundaries=np.linspace(-0.1,2.5,N_RapidityBins)), 
-                y_name : dict(boundaries=np.linspace(-0.1,2.5,N_RapidityBins))
+        return { x_name : dict(boundaries=np.linspace(0.,2.5,N_RapidityBins)), 
+                y_name : dict(boundaries=np.linspace(0.,2.5,N_RapidityBins))
                }         
     #----------------------------------------------------------------------------   
     
@@ -182,48 +189,63 @@ def DefineBinsforProjVar (effFitter, x_var,y_var) :
     return defineBins
     
     
-def NjetsEffPlots (effFitter, x_var, y_var,m_gamma_cat=0, Njets=0, effTag=False) :
+def NjetsEffPlots (effFitter, x_var, y_var, prodProc=[], m_gamma_cat=0, Njets=0, effTag=False,
+                  savepath=None) :
     #----------------------------------------------------------------------------  
     if (x_var == y_var) :
         print('Please choose 2 different variables for the projection plot')
     else :
         defineBins = DefineBinsforProjVar(effFitter, x_var,y_var)
 
+        """
         df = effFitter.df
         first_train_evt = int(round(df.index.size*(1.-effFitter.split_frac)))
         #take the test sample 
         df_test = df[:first_train_evt]
+        """
+        df_initial = effFitter.df
+        first_train_evt = int(round(df_initial.index.size*(1.-effFitter.split_frac)))
+        #take the test sample 
+        df_test_initial = df_initial[:first_train_evt]
+
+        
+        for proc in prodProc :
+            print(proc)
+            df = df_initial[df_initial['proc']==proc]
+            df_test = df_test_initial[df_test_initial['proc']==proc]
+        
+
+            if effTag :
+                NjetsCat = 0
+            else :
+                NjetsCat = 3*Njets +1 + m_gamma_cat
+
+            i = NjetsCat
+
+            column_proba_name = 'recoNjets2p5Cat_prob_'+str(i)
 
 
 
-        if effTag :
-            NjetsCat = 0
-        else :
-            NjetsCat = 3*Njets +1 + m_gamma_cat
-    
-        i = NjetsCat
 
-        column_proba_name = 'recoNjets2p5Cat_prob_'+str(i)
 
-        gb_freq  = df.groupby([x_var+'Bin',y_var+'Bin']).apply(weight_freq,"recoNjets2p5Cat",(i-1),'absweight')
-        gb_proba = df_test.groupby([x_var+'Bin',y_var+'Bin']).apply(weighted_average, column_proba_name,'absweight')
-        #gb_proba = df.groupby([x_var+'Bin',y_var+'Bin']).apply(weighted_average, column_proba_name,'absweight')
+            gb_freq  = df.groupby([x_var+'Bin',y_var+'Bin']).apply(weight_freq,"recoNjets2p5Cat",(i-1),'weight')
+            gb_proba = df_test.groupby([x_var+'Bin',y_var+'Bin']).apply(weighted_average, column_proba_name,'weight')
 
-        #print(gb_proba.index.levels)
 
-        title1 ='recoNjetsCat('+str(i-1)+') \n predicted by clf'
-        title2 ='recoNjetsCat('+str(i-1)+') \n true from data'
+            title1 ='recoNjetsCat('+str(i-1)+') \n predicted by clf'
+            title2 ='recoNjetsCat('+str(i-1)+') \n true from data'
 
 
 
-        if (i==0) :
-            #print('perform efficiency (1- reco-proba) plot')
-            plot_imshow([gb_proba,gb_freq],binBoundaries=defineBins,x_lab=x_var,y_lab=y_var,titles=['predicted (clf) reco eff',
-                                                                        'true data reco eff'],effTag=True)
-        else :
-            plot_imshow([gb_proba,gb_freq],binBoundaries=defineBins, x_lab=x_var,y_lab=y_var,titles=[title1,title2])
+            if (i==0) :
+                #print('perform efficiency (1- reco-proba) plot')
+                plot_imshow([gb_proba,gb_freq],binBoundaries=defineBins,x_lab=x_var,y_lab=y_var,titles=['predicted (clf) reco eff',
+                                                                            'true data reco eff'],effTag=True,savepath=savepath)
+            else :
+                plot_imshow([gb_proba,gb_freq],binBoundaries=defineBins, x_lab=x_var,y_lab=y_var,titles=[title1,title2],
+                            savepath=savepath)
 
-        #----------------------------------------------------------------------------
+            #----------------------------------------------------------------------------
     
 def weighted_average(df_name, column_name, weight_name=None):
     """
@@ -267,11 +289,12 @@ def plot_imshow(groupby_objects, binBoundaries,
                         x_lab = None,
                         y_lab = None,
                         cmap=plt.cm.Blues,
-                        effTag=False, effPlot=False):
+                        effTag=False, effPlot=False,
+               savepath=None):
     #----------------------------------------------------------------------------
     if effTag :
         plot_imshow(groupby_objects, binBoundaries=binBoundaries, titles=['predicted (clf) reco eff', 'true (data) reco eff'],
-                    x_lab = x_lab, y_lab = y_lab, cmap=plt.cm.Reds, effTag=False, effPlot=True)
+                    x_lab = x_lab, y_lab = y_lab, cmap=plt.cm.Reds, effTag=False, effPlot=True, savepath=savepath)
     else :
         cm_list = []
 
@@ -329,14 +352,21 @@ def plot_imshow(groupby_objects, binBoundaries,
         cbar_ax = fig.add_axes([0.1, 0.98, 0.8, 0.02])
         plt.colorbar(cax=cbar_ax,orientation='horizontal')#,norm=plt.colors.Normalize(vmin=min_col,vmax=max_col))
 
-        plt.show()
+        if (savepath == None) :
+            print('no savepath')
+            plt.show()
+        else :
+            print(savepath)
+            plt.savefig(savepath)
         
         if l == 0 :
             plotRelDiff_imshow(groupby_objects=groupby_objects,binBoundaries=binBoundaries,
-                                       x_lab=x_lab,y_lab=y_lab,cmap=plt.cm.Oranges,effPlot=True)
+                                       x_lab=x_lab,y_lab=y_lab,cmap=plt.cm.Oranges,effPlot=True,
+                              savepath=savepath)
         else :
             plotRelDiff_imshow(groupby_objects=groupby_objects,binBoundaries=binBoundaries,
-                                       x_lab=x_lab,y_lab=y_lab,cmap=plt.cm.Oranges)
+                                       x_lab=x_lab,y_lab=y_lab,cmap=plt.cm.Oranges,
+                              savepath=savepath)
             
     #----------------------------------------------------------------------------
 
@@ -345,7 +375,8 @@ def plotRelDiff_imshow(groupby_objects,binBoundaries,
                         x_lab = None,
                         y_lab = None,
                           cmap=plt.cm.Blues,
-                      effPlot=False) :
+                      effPlot=False,
+                      savepath=None) :
     #----------------------------------------------------------------------------   
         
     fig = plt.figure(figsize=(7,7))
@@ -401,6 +432,12 @@ def plotRelDiff_imshow(groupby_objects,binBoundaries,
     fig.subplots_adjust(top=0.78)   
     cbar_ax = fig.add_axes([0.15, 0.97, 0.7, 0.02])
     cb = plt.colorbar(cax=cbar_ax,orientation='horizontal')
+    
+    if (savepath == None) :
+        plt.show()
+    else :
+        print(savepath+'_relDif')
+        plt.savefig(savepath+'_relDif')
     #----------------------------------------------------------------------------   
 
     
