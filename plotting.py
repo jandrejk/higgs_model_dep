@@ -243,13 +243,21 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
         
         sum_of_weights = df['weight'].sum()
         #the outcome of trueh is an int
-        trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=df['weight'])[0].ravel() / sum_of_weights
+        trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=df['weight'])[0].ravel() #/ sum_of_weights
+        print(trueh)
+        print(df[df[target]==-1]['weight'].sum())
+        print(df[df[target]==0]['weight'].sum())
+        print(df[df[target]==1]['weight'].sum())
+        print(df[df[target]==2]['weight'].sum())
         
+        square_weight = np.multiply(df['weight'],df['weight'])
+        Var_trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=square_weight)[0].ravel() 
         
         # no of positive weight events
         mu_1 = df[df['weight']>0].groupby(target).count()['weight'].values
         # no of negative weight events
         mu_2 = df[df['weight']<0].groupby(target).count()['weight'].values
+        
         
         # take the mean of the absolute weights as an approximate multiplication
         # factor for the average detector eff and lumi-factor correction.
@@ -257,12 +265,26 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
         
         
         N_est_evts = np.multiply((mu_1-mu_2),avg_absweight) 
+
+        print(Var_trueh)
         
+        print(mu_1)
+        print(mu_2)
+        print(N_est_evts)
+        print(avg_absweight)
+        print('sum of weights: ', sum_of_weights)
+        print('sum of absweights: ', df['absweight'].sum())
         
         err_pos = +np.multiply(skellam.ppf(1.-0.16, mu_1, mu_2),avg_absweight) - N_est_evts
         err_neg = -np.multiply(skellam.ppf(0.16, mu_1, mu_2),avg_absweight)    + N_est_evts
         err_pos = err_pos / sum_of_weights
         err_neg = err_neg / sum_of_weights
+        
+        print('sellam pos', skellam.ppf(1.-0.16, mu_1, mu_2))
+        print('sellam neg', skellam.ppf(0.16, mu_1, mu_2))
+        
+        print('errpos', err_pos )
+        print('errneg', err_neg )
         
         predh = []
         for c in pred_cols :
@@ -287,11 +309,11 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
                        yerr=np.sqrt(trueh[first:]),
                        ecolor='black')
         plt.ylabel("No. of events")
-    
+        print('sqrt error for poissonian', np.sqrt(trueh[first:]))
     else :
         true = ax.errorbar(xp,trueh[first:],ls='None',
                         xerr=np.ones_like(xp)*0.5,
-                        yerr=[abs(err_neg)[first:],err_pos[first:]],#np.sqrt(trueh[first:]),
+                        yerr=np.sqrt(Var_trueh[first:]),#[abs(err_neg)[first:],err_pos[first:]],#np.sqrt(trueh[first:]),
                         ecolor='black')
         plt.ylabel("No. of events (weighted)")
     
@@ -342,7 +364,7 @@ def weighted_average(df_name, column_name, weight_name=None):
     else :
         try:
             w = df_name[weight_name]
-            return (d * w).sum() / float(w.sum())
+            return (d * w).sum() #/ float(w.sum())
         except ZeroDivisionError:
             return float(d.mean())
     #----------------------------------------------------------------------------
