@@ -182,17 +182,12 @@ def loadOrMake():
         print('onDisk.recoBranches', onDisk.recoBranches)
         print('params["recoBranches"]', params["recoBranches"])
         
-        
-        
-        
         if onDisk.genBranches != params["genBranches"] or onDisk.recoBranches != params["recoBranches"]:
             make = True
                 
         if onDisk.ncats != params["ncats"]:
             make = True
             load = False
-            
-                       
     else:
         make = True
     
@@ -234,7 +229,7 @@ def loadOrMake():
         # fold also the rapidity space of the jets, i.e. only care about absolut values of
         # jet rapidities
         JetRapidityNames = ['genJet2p5Rapidity0','genJet2p5Rapidity1',
-                            'genJet2p5Rapidity2','genJet2p5Rapidity3','genJet2p5Rapidity4']
+                            'genJet2p5Rapidity2','genJet2p5Rapidity3']
         for jetRapName in JetRapidityNames :
             #replace gen with absGen (mind the capital G)
             if jetRapName in made.df.columns and ( not 'abs'+'G'+jetRapName[1:] in made.df.columns ):
@@ -279,7 +274,7 @@ def target_name(key):
     return key+postFix 
 
 # -------------------------------------------------------------------------------------
-def runTraining(effFitter,useAbsWeight=True):
+def runTraining(effFitter):
     global params
     to_train = filter(lambda x: x not in effFitter.clfs.keys(), params["classifiers"])
 
@@ -291,17 +286,11 @@ def runTraining(effFitter,useAbsWeight=True):
         print("Fitting %s" % key)
         print(classifier)
         print(train_params)
-        if useAbsWeight :
-            if key == 'class':
-                effFitter.fitClass(classifier=classifier,**train_params)
-            else:
-                effFitter.fitBins(key,classifier=classifier,**train_params)
-        else :
-            if key == 'class':
-                effFitter.fitClass(classifier=classifier,weight_name='weight',**train_params)
-            else:
-                effFitter.fitBins(key,classifier=classifier,weight_name='weight',**train_params)
-        
+        if key == 'class':
+            effFitter.fitClass(classifier=classifier,**train_params)
+        else:
+            effFitter.fitBins(key,classifier=classifier,**train_params)
+
 
 # -------------------------------------------------------------------------------------
 def runEvaluation(effFitter):

@@ -184,6 +184,9 @@ def efficiency_map(x,y,z,cmap=plt.cm.viridis,layout=None,
     cbar_ax = fig.add_axes([0.15, 0.97, 0.7, 0.02])
     plt.colorbar(cax=cbar_ax,orientation='horizontal')
     
+
+    
+    
     
 # ---------------------------------------------------------------------------
 def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
@@ -223,7 +226,7 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
     
     pred_cols = map(lambda x: ("%s_prob_%d" % (target, x)), range(nstats) ) 
     
-    print(pred_cols)
+    #print(pred_cols)
     
     
     if absolute :
@@ -235,7 +238,15 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
         #the predicted hist sums over all events weighted by their probability
         #hence the result is a float
         predh = np.array((df[pred_cols]).sum(axis=0)).ravel()
-    
+        
+        draw_data_mc(bins = np.arange(-1.5+first,nstats-0.5),
+                    corr = predh[first:],
+                    data = trueh[first:],
+                    ratio=True,
+                    var=[column+' category',''],
+                    savepath=savepath,
+                    title=title)
+        savepath = None 
     else :
         # here the weights are taken into account. In order to estimate the 
         # uncertaintiy on the weighted number of events the skellam dist function
@@ -244,12 +255,14 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
         sum_of_weights = df['weight'].sum()
         #the outcome of trueh is an int
         trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=df['weight'])[0].ravel() #/ sum_of_weights
+        
+        """
         print(trueh)
         print(df[df[target]==-1]['weight'].sum())
         print(df[df[target]==0]['weight'].sum())
         print(df[df[target]==1]['weight'].sum())
         print(df[df[target]==2]['weight'].sum())
-        
+        """
         square_weight = np.multiply(df['weight'],df['weight'])
         Var_trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=square_weight)[0].ravel() 
         
@@ -266,6 +279,7 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
         
         N_est_evts = np.multiply((mu_1-mu_2),avg_absweight) 
 
+        """
         print(Var_trueh)
         
         print(mu_1)
@@ -274,20 +288,23 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
         print(avg_absweight)
         print('sum of weights: ', sum_of_weights)
         print('sum of absweights: ', df['absweight'].sum())
+        """
         
         err_pos = +np.multiply(skellam.ppf(1.-0.16, mu_1, mu_2),avg_absweight) - N_est_evts
         err_neg = -np.multiply(skellam.ppf(0.16, mu_1, mu_2),avg_absweight)    + N_est_evts
         err_pos = err_pos / sum_of_weights
         err_neg = err_neg / sum_of_weights
         
+        """
         print('sellam pos', skellam.ppf(1.-0.16, mu_1, mu_2))
         print('sellam neg', skellam.ppf(0.16, mu_1, mu_2))
         
         print('errpos', err_pos )
         print('errneg', err_neg )
-        
+        """
         predh = []
         for c in pred_cols :
+            #print(c)
             predh.append(weighted_average(df,c,'weight'))
         
 
@@ -313,7 +330,7 @@ def naive_closure(df,column,first=0,logy=False,title=None,absolute=True,
     else :
         true = ax.errorbar(xp,trueh[first:],ls='None',
                         xerr=np.ones_like(xp)*0.5,
-                        yerr=np.sqrt(Var_trueh[first:]),#[abs(err_neg)[first:],err_pos[first:]],#np.sqrt(trueh[first:]),
+                        yerr=[abs(err_neg)[first:],err_pos[first:]],#np.sqrt(Var_trueh[first:]),#[abs(err_neg)[first:],err_pos[first:]],#np.sqrt(trueh[first:]),
                         ecolor='black')
         plt.ylabel("No. of events (weighted)")
     
@@ -444,4 +461,179 @@ def control_plots(key,fitter):
     naive_closure(df[df['absGenRapidity'] < 0.25],key,
                   title='|y| < 0.25',
                   first=1,logy=False)
-  
+    
+
+def OrderPerCategory (array,n) :
+    re_ordered = np.array([])
+    for i in xrange(n) :
+        re_ordered = np.append(re_ordered,array[i::n]) 
+    return re_ordered    
+    
+# ---------------------------------------------------------------------------    
+def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False,
+                savepath = None,title=None,absolute=True):
+    
+    
+    
+    target = target_name(column)
+    #extract the number of features that belong to column
+    nstats = np.unique(df[target]).size
+    print("There are " + str(nstats) + " features of type " + str(target))
+    
+    pred_cols = map(lambda x: ("%s_prob_%d" % (target, x)), range(nstats) ) 
+    
+     
+    if absolute :    
+        #the outcome of trueh is an int
+        trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5))[0].ravel() 
+        #the predicted hist sums over all events weighted by their probability
+        #hence the result is a float
+        predh = np.array((df[pred_cols]).sum(axis=0)).ravel()  
+
+        #reorder the histograms per mass category:
+        trueh = OrderPerCategory(trueh,3)
+        predh = OrderPerCategory(predh,3)
+    
+    else :
+        predh = []
+        for c in pred_cols :
+            #print(c)
+            predh.append(weighted_average(df,c,'weight'))
+        
+        trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=df['weight'])[0].ravel() 
+        
+        
+        
+    bins = np.arange(-1.5+first,nstats-0.5)
+    corr = predh[first:]
+    data = trueh[first:]
+    
+     
+    
+    
+    binw=bins[1]-bins[0]
+    
+    if ratio:
+        fig, axes = plt.subplots(2,figsize=figsize,sharex=True,gridspec_kw = {'height_ratios':[3, 1]})
+        top = axes[0]
+        bottom = axes[1]
+    else:
+        fig = plt.figure(figsize=figsize)
+        axes = None
+        top = plt
+    #fig.tight_layout()
+    fig.suptitle(title+'\n',fontsize=20,y=1.03)
+
+    xc = bins[1:]-binw*0.5
+     
+    corr_label = 'BDT pred'
+    
+    
+    top.bar(xc-.5,corr,width=binw,label=corr_label,alpha=0.5,color='green',linewidth=0.5, edgecolor='black')
+    
+    if absolute :
+        top.errorbar( xc, data,ls='None', xerr=np.ones_like(data)*binw*0.5, yerr=np.sqrt(data), color='black', label='true' )
+    else :
+        print('errors on top plot')
+    
+    
+    
+    if (column == 'class') :
+        bottom.set_xticklabels(['good','medium','bad'])
+    if (column == 'recoPt') :
+        lab = ['0-15','15-30','30-45','45-85','85-125','125-200','200-350','350+']
+        var[1] = 'GeV'
+        bottom.set_xticklabels(np.hstack((lab,lab,lab)),rotation=90,fontsize=12)
+    
+    if (column == 'recoNjets2p5') :
+        lab = ['0','1','2','3','4+']
+        bottom.set_xticklabels(np.hstack((lab,lab,lab)))
+    
+    
+    
+    #set lines to separate mres cat's
+    top.axvline((nstats-1)/3-0.5,linewidth=1.5)
+    top.axvline(2*(nstats-1)/3-0.5,linewidth=1.5)
+    
+    bottom.axvline((nstats-1)/3-0.5,linewidth=1.5)
+    bottom.axvline(2*(nstats-1)/3-0.5,linewidth=1.5)
+    
+    
+    #add titles
+    leftT, width = .1, .5
+    bottomT, height = 1.1, .5
+    top.text(leftT, bottomT, r'$m_\mathrm{res}$ good',
+        horizontalalignment='left',
+        verticalalignment='top',
+        color='blue',
+        fontsize=16,
+        transform=top.transAxes)
+
+    leftT, width = .38, .5
+    bottomT, height = 1.1, .5
+    top.text(leftT, bottomT, r'$m_\mathrm{res}$ medium',
+        horizontalalignment='left',
+        verticalalignment='top',
+        color='blue',
+        fontsize=16,
+        transform=top.transAxes)
+    
+    leftT, width = .75, .5
+    bottomT, height = 1.1, .5
+    top.text(leftT, bottomT, r'$m_\mathrm{res}$ bad',
+        horizontalalignment='left',
+        verticalalignment='top',
+        color='blue',
+        fontsize=16,
+        transform=top.transAxes)
+
+    
+    if axes == None: axes = fig.axes
+    
+    if ratio:
+        bottom.xaxis.set_ticks(bins+0.5)
+    
+        rdata = corr / data 
+        rdata_err = rdata * np.sqrt(data) / data 
+        corr_color = 'green'
+            
+        if absolute :    
+            bottom.errorbar( xc, rdata,ls='None', xerr=np.ones_like(rdata)*binw*0.5, yerr=rdata_err, 
+                        color=corr_color)
+        else :
+            print('bottom error bars')
+        
+        bottom.set_ylim(0.8,1.2)
+        bottom.yaxis.set_ticks(np.arange(0.8,1.3,0.1))
+        
+        
+        bottom.plot( (bins[0],bins[-1]), (1,1), 'k--',linewidth=.6 )
+        bottom.set_ylabel('pred / true')
+        
+    if logy:
+        axes[0].set_yscale('log')
+    axes[0].set_xlim(bins[0],bins[-1])
+    
+    unit = None    
+    if var != None:
+        if type(var) != str:
+            var, unit = var
+        if unit: var += " (%s)" % unit
+        axes[-1].set_xlabel(var)
+    ylabel = 'Events / %1.3g' % binw
+    if unit:
+        ylabel += ' %s' % unit
+    axes[0].set_ylabel(ylabel)
+
+    #top.legend(loc='best') 
+    top.legend(bbox_to_anchor=(1., 1.35))
+
+    
+    if (savepath != None) :
+        try :
+            plt.savefig(savepath+'/'+title,bbox_inches='tight')
+        except IOError :
+            os.mkdir(savepath)
+            plt.savefig(savepath+'/'+title,bbox_inches='tight')
+      
+   

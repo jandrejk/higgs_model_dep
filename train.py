@@ -192,13 +192,13 @@ class EfficiencyFitter(object):
         
 
     # ---------------------------------------------------------------------------
-    def fitClass(self,**kwargs):
+    def fitClass(self,weight_name='absweight',**kwargs):
 
         if not 'absGenRapidity' in self.df.columns:
             self.df['absGenRapidity'] = np.abs(self.df['genRapidity'])
         
         Xbr = ['genPt','absGenRapidity','genLeadGenIso','genSubleadGenIso']
-        self.clfs['class'] = self.runFit(Xbr,'class','absweight',**kwargs)
+        self.clfs['class'] = self.runFit(Xbr,'class',wbr=weight_name,**kwargs)
         
         return self.clfs['class']
 
@@ -373,7 +373,7 @@ class EfficiencyFitter(object):
         return '%sBin' % column,'%sCat' % column
           
     # ---------------------------------------------------------------------------
-    def fitBins(self,column,Xbr,factorized=False,includeClassProbs=True,boundaries=[],**kwargs):
+    def fitBins(self,column,Xbr,weight_name='absweight',factorized=False,includeClassProbs=True,boundaries=[],**kwargs):
 
         binColumn,catColumn = self._binColName(column)
         
@@ -381,12 +381,12 @@ class EfficiencyFitter(object):
             self.defineBins(catColumn,boundaries)
         
         if factorized:
-            clf = self.runFit(Xbr,binColumn,'absweight',mask=(self.df['class']>=0),**kwargs)
+            clf = self.runFit(Xbr,binColumn,wbr=weight_name,mask=(self.df['class']>=0),**kwargs)
         else:
             if includeClassProbs:
                 Xbr.extend( filter(lambda x: x.startswith("class_prob_"), self.df.columns  ) )
             
-            clf = self.runFit(Xbr,catColumn,'absweight',**kwargs)
+            clf = self.runFit(Xbr,catColumn,wbr=weight_name,**kwargs)
             
         self.clfs[column] = clf
         

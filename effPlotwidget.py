@@ -75,7 +75,7 @@ def defaultWidgets (**kwargs) :
         )
 
     widgetparams['w_mres_cat'] = widgets.ToggleButtons(
-        options={'bad':0, 'medium':1, 'good':2},
+        options={'good':0, 'medium':1, 'bad':2},
         description='Di-photon mass resolution:',
         disabled=False,
         button_style='', # 'success', 'info', 'warning', 'danger' or ''
@@ -103,7 +103,8 @@ def defaultWidgets (**kwargs) :
 
 def GetFitter ( dataDir, inputName, 
                 inputDir,
-                load
+                load,
+               genBranch_params = None
               ) :
     
     #---------------------------------------------------------------------------- 
@@ -121,6 +122,10 @@ def GetFitter ( dataDir, inputName,
         w_load_bar.value += 1
         ut.setParams()
         w_load_bar.value += 1
+        
+        if (genBranch_params != None) :
+            ut.params["genBranches"] = genBranch_params
+        
         effFitter = ut.loadOrMake()
         w_load_bar.value += 1
 
@@ -308,7 +313,7 @@ def plot_imshow(groupby_objects, binBoundaries,
             cm_list.append(cm.T)    
 
 
-        fig, axarr = plt.subplots(1,2,figsize=(10,10))
+        fig, axarr = plt.subplots(1,2,figsize=(12,12))
 
 
         minimum = np.amin(cm_list)
@@ -347,17 +352,22 @@ def plot_imshow(groupby_objects, binBoundaries,
             for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
                 plt.text(j, i, '%.2f' % cm[i, j], horizontalalignment="center",
                                  color="white" if cm[i, j] > thresh else "black")
-
+        
+        plt.subplots_adjust(left=None, bottom=None, right=None, top=0.95, wspace=0.1, hspace=None)
         fig.subplots_adjust(top=0.85)   
         cbar_ax = fig.add_axes([0.1, 0.98, 0.8, 0.02])
         plt.colorbar(cax=cbar_ax,orientation='horizontal')#,norm=plt.colors.Normalize(vmin=min_col,vmax=max_col))
-
+        
+        #plt.tight_layout()
+        
+        """
         if (savepath == None) :
             print('no savepath')
             plt.show()
         else :
             print(savepath)
-            plt.savefig(savepath)
+            plt.savefig(savepath,bbox_inches='tight')
+        """
         
         if l == 0 :
             plotRelDiff_imshow(groupby_objects=groupby_objects,binBoundaries=binBoundaries,
@@ -371,7 +381,9 @@ def plot_imshow(groupby_objects, binBoundaries,
     #----------------------------------------------------------------------------
 
 
-def plotRelDiff_imshow(groupby_objects,binBoundaries, 
+def plotRelDiff_imshow(groupby_objects,binBoundaries,
+                       true_err=[],
+                       title = '',
                         x_lab = None,
                         y_lab = None,
                           cmap=plt.cm.Blues,
@@ -389,20 +401,44 @@ def plotRelDiff_imshow(groupby_objects,binBoundaries,
     cm_pred = r_pred.values.reshape(len(x_pred),len(y_pred))
     cm_true = r_true.values.reshape(len(x_true),len(y_true))
 
+    
+    if (len(true_err) != 0) :
+        x_true_err, y_true_err = true_err.index.levels
+        cm_err = true_err.values.reshape(len(x_true_err),len(y_true_err))
+        cm_err = cm_err.T
+    else :
+        cm_err = (cm_true-cm_true).T
+    
+
     if effPlot :
         cm_true = 1. - cm_true
         cm_pred = 1. - cm_pred
 
-    total_sum_true_percent = np.sum(np.sum(cm_true))/100.
+    total_sum_true_permille = np.sum(np.sum(cm_true))/1000.
     #print(total_sum_true_permille)
 
-    cm = np.divide((cm_true-cm_pred),cm_true, out=np.zeros_like(cm_true-cm_pred), 
-                   where=cm_true>total_sum_true_percent ) 
+    cm = np.divide((cm_pred-cm_true),cm_true, out=np.zeros_like(cm_true-cm_pred), 
+                   where=(cm_true>total_sum_true_permille) ) 
 
     cm = cm.T
-
+    
+    cm_abs_diff = abs(cm_pred-cm_true).T
+    
+    #plt.plot(np.arange(len(cm_true.T.ravel())),cm_true.T.ravel(),'bo')
+    #plt.errorbar(np.arange(len(cm_true.T.ravel())),cm_true.T.ravel(), yerr=cm_err.ravel())
+    #plt.yscale('log')
+    #plt.ylim(0,1)
+    #plt.show()
+    
+    
+    
+    
+    
+    
+    
+    
     plt.imshow(cm, interpolation='nearest', cmap=cmap,origin='lower')
-    plt.title(r'$\frac{\mathrm{true} - \mathrm{pred}}{\mathrm{true}}$'+ '\n')
+    plt.title(title+r'$\frac{\mathrm{pred} - \mathrm{true}}{\mathrm{true}}$'+ '\n'+str(cm.sum()))
 
 
 
@@ -420,9 +456,30 @@ def plotRelDiff_imshow(groupby_objects,binBoundaries,
 
 
     thresh = (cm.max()+cm.min()) / 2.
+    
+    #print(cm_abs_diff)
+    
+    #print(cm_true.T)
+    
+    #print(cm_err)
+    
+    
+    
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(j, i, np.round(cm[i, j],2), horizontalalignment="center",
-                 color="white" if cm[i, j] > thresh else "black")
+        
+        """
+        if (cm_err[i,j] == 'NoEv') :
+            print(cm_err[i,j])
+            plt.text(j, i, cm_err[i, j], horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+        if (abs(cm[i,j]) > 0.2 ) :
+            plt.text(j, i, np.round(cm[i, j],2), horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+        """
+        if (cm_abs_diff[i,j] > 2*cm_err[i,j] ) :
+            plt.text(j, i, np.round(cm[i, j],2), horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
 
 
     plt.xlabel(x_lab)
@@ -433,11 +490,13 @@ def plotRelDiff_imshow(groupby_objects,binBoundaries,
     cbar_ax = fig.add_axes([0.15, 0.97, 0.7, 0.02])
     cb = plt.colorbar(cax=cbar_ax,orientation='horizontal')
     
+    
     if (savepath == None) :
         plt.show()
     else :
         print(savepath+'_relDif')
         plt.savefig(savepath+'_relDif')
+    
     #----------------------------------------------------------------------------   
 
     
