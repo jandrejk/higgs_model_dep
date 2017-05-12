@@ -465,8 +465,17 @@ def control_plots(key,fitter):
 
 def OrderPerCategory (array,n) :
     re_ordered = np.array([])
-    for i in xrange(n) :
-        re_ordered = np.append(re_ordered,array[i::n]) 
+    
+    N = len(array)
+    if (N%n == 0) :
+        for i in xrange(n) :
+            re_ordered = np.append(re_ordered,array[i::n]) 
+    else :
+        first = array[0]
+        new_array = array[1:]
+        for i in xrange(n) :
+            re_ordered = np.append(re_ordered,new_array[i::n]) 
+        re_ordered = np.append(first,re_ordered)
     return re_ordered    
     
 # ---------------------------------------------------------------------------    
@@ -502,15 +511,13 @@ def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False
         
         trueh = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=df['weight'])[0].ravel() 
         
-        
+        #reorder the histograms per mass category:
+        trueh = OrderPerCategory(trueh,3)
+        predh = OrderPerCategory(predh,3)
         
     bins = np.arange(-1.5+first,nstats-0.5)
     corr = predh[first:]
-    data = trueh[first:]
-    
-     
-    
-    
+    data = trueh[first:]    
     binw=bins[1]-bins[0]
     
     if ratio:
@@ -532,10 +539,75 @@ def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False
     top.bar(xc-.5,corr,width=binw,label=corr_label,alpha=0.5,color='green',linewidth=0.5, edgecolor='black')
     
     if absolute :
-        top.errorbar( xc, data,ls='None', xerr=np.ones_like(data)*binw*0.5, yerr=np.sqrt(data), color='black', label='true' )
+        top.errorbar( xc, data,ls='None', xerr=np.ones_like(data)*binw*0.5, yerr=np.sqrt(data), color='black', label=r'true $1 \sigma$' )
     else :
-        print('errors on top plot')
-    
+        trueh_posw = np.histogram(df[df['weight']>=0][target],np.arange(-1.5,nstats-0.5))[0].ravel() 
+        trueh_negw = np.histogram(df[df['weight']<0][target],np.arange(-1.5,nstats-0.5))[0].ravel() 
+        
+        #reorder the histograms per mass category:
+        trueh_posw = OrderPerCategory(trueh_posw,3)
+        trueh_negw = OrderPerCategory(trueh_negw,3)
+        
+        
+        hist_mu_0 = trueh_posw - trueh_negw
+        hist_sigma_0 = np.sqrt(trueh_posw + trueh_negw)
+        
+        """
+        for k in xrange(4) :
+            fig, ax = plt.subplots(1, 1)
+
+            mu1 = trueh_posw[k]
+            mu2 = trueh_negw[k]
+            
+            x = np.arange(skellam.ppf(0.01, mu1, mu2),
+              skellam.ppf(0.99, mu1, mu2))
+
+            
+            ax.plot(x, skellam.pmf(x, mu1, mu2), 'bo', ms=8, label='skellam pmf')
+            ax.vlines(x, 0, skellam.pmf(x, mu1, mu2), colors='b', lw=5, alpha=0.5)
+
+            rv = skellam(mu1, mu2)
+            ax.vlines(x, 0, rv.pmf(x), colors='k', linestyles='-', lw=1,
+                    label='frozen pmf')
+            ax.legend(loc='best', frameon=False)
+            plt.show()
+        """
+        
+        #one sigma
+        hist_sigma = 1.*trueh*hist_sigma_0/hist_mu_0
+        
+        #investigate difference to ppf
+        #Does not work since at some point values are zero
+        CL = .68
+        
+        hist_s_pos = skellam.ppf(CL,trueh_posw,trueh_negw) - hist_mu_0
+        #print(hist_s_pos)
+        hist_s_pos = 1.*trueh*hist_s_pos/hist_mu_0
+        
+        hist_s_neg = hist_mu_0 - skellam.ppf(1.-CL,trueh_posw,trueh_negw)
+        hist_s_neg = 1.*trueh*hist_s_neg/hist_mu_0
+        
+        #print(hist_s_pos)
+        #print(hist_s_neg)
+        
+        """
+        top.errorbar( xc, data,ls='None', xerr=np.ones_like(data)*binw*0.5, yerr=[abs(hist_s_neg[first:]),hist_s_pos[first:]], color='black', 
+                     label='true '+str(int(100*CL))+'% CL' )
+        """
+        top.errorbar( xc, data,ls='None', xerr=np.ones_like(data)*binw*0.5, yerr=hist_sigma[first:], color='black', 
+                     label=r'true $1 \sigma$')
+        
+        
+        
+        """
+        norm = np.histogram(df[target],np.arange(-1.5,nstats-0.5))[0].ravel() 
+
+        abspuw = np.histogram(df[target],np.arange(-1.5,nstats-0.5),weights=df['absweight'])[0].ravel() 
+        average = np.divide(abspuw,norm)        
+        print(average)
+        print(np.divide(trueh,hist_mu_0))
+        """
+        
     
     
     if (column == 'class') :
@@ -562,7 +634,7 @@ def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False
     #add titles
     leftT, width = .1, .5
     bottomT, height = 1.1, .5
-    top.text(leftT, bottomT, r'$m_\mathrm{res}$ good',
+    top.text(leftT, bottomT, r'$\frac{\sigma_M}{M}$ good',
         horizontalalignment='left',
         verticalalignment='top',
         color='blue',
@@ -571,7 +643,7 @@ def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False
 
     leftT, width = .38, .5
     bottomT, height = 1.1, .5
-    top.text(leftT, bottomT, r'$m_\mathrm{res}$ medium',
+    top.text(leftT, bottomT, r'$\frac{\sigma_M}{M}$ medium',
         horizontalalignment='left',
         verticalalignment='top',
         color='blue',
@@ -580,7 +652,7 @@ def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False
     
     leftT, width = .75, .5
     bottomT, height = 1.1, .5
-    top.text(leftT, bottomT, r'$m_\mathrm{res}$ bad',
+    top.text(leftT, bottomT, r'$\frac{\sigma_M}{M}$ bad',
         horizontalalignment='left',
         verticalalignment='top',
         color='blue',
@@ -593,16 +665,20 @@ def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False
     if ratio:
         bottom.xaxis.set_ticks(bins+0.5)
     
-        rdata = corr / data 
-        rdata_err = rdata * np.sqrt(data) / data 
-        corr_color = 'green'
+        
+        corr_color = 'black'
             
         if absolute :    
-            bottom.errorbar( xc, rdata,ls='None', xerr=np.ones_like(rdata)*binw*0.5, yerr=rdata_err, 
-                        color=corr_color)
+            rdata = corr / data 
+            rdata_err = rdata * np.sqrt(data) / data 
+            bottom.errorbar( xc, rdata,ls='None', xerr=np.ones_like(rdata)*binw*0.5, yerr=rdata_err, color=corr_color)
         else :
-            print('bottom error bars')
-        
+            
+            rdata = corr / data 
+            rdata_err = rdata * hist_sigma[first:] / data 
+            bottom.errorbar( xc, rdata,ls='None', xerr=np.ones_like(rdata)*binw*0.5, yerr=rdata_err, color=corr_color)
+            
+            
         bottom.set_ylim(0.8,1.2)
         bottom.yaxis.set_ticks(np.arange(0.8,1.3,0.1))
         
@@ -626,7 +702,7 @@ def draw_data_mc(df,column,first=0,figsize=(8,6),var=None,logy=False,ratio=False
     axes[0].set_ylabel(ylabel)
 
     #top.legend(loc='best') 
-    top.legend(bbox_to_anchor=(1., 1.35))
+    top.legend(bbox_to_anchor=(1.02, 1.4))
 
     
     if (savepath != None) :

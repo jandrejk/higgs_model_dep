@@ -251,9 +251,13 @@ class EfficiencyFitter(object):
         print(Xbr)
         print(Ybr)
         
+        # use the mask - but didn't know how to pass on
+        mask = 'bla'
+        
         if mask != None:
             self.split = None
-            df = self.df[mask]
+            #df = self.df[mask]
+            df = self.df[self.df['proc']==1]
         else:
             df = self.df
 
@@ -263,7 +267,8 @@ class EfficiencyFitter(object):
             traindf = df[first_train_evt:]
         else:
             traindf = df
-            
+        
+                    
         X_train,y_train = traindf[Xbr][:trainevts].values,traindf[Ybr][:trainevts].values
         w_train = None if not wbr else traindf[wbr][:trainevts].values
         

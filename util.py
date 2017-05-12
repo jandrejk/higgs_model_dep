@@ -187,6 +187,7 @@ def loadOrMake():
         
         if onDisk.genBranches != params["genBranches"] or onDisk.recoBranches != params["recoBranches"]:
             make = True
+            #make = False
                 
         if onDisk.ncats != params["ncats"]:
             make = True
@@ -198,15 +199,20 @@ def loadOrMake():
     
     
     if make or forceMake:
-        if not load:
-            #Initialize an instance of the class EfficiencyFitter
-            made = tn.EfficiencyFitter(name)
-        else:
-            made = onDisk
-          
         files = params.get("dataFiles",[])
         if len(files) == 0:
             files.append( (0,params["dataFname"]) )
+        if not load:
+            #Initialize an instance of the class EfficiencyFitter
+            made = tn.EfficiencyFitter(name)
+            made.input_files = files
+        else:
+            made = onDisk
+            if hasattr(made,"files"):
+                files = made.files
+            else:
+                print("Warining: efficiency fitter on disk did not store the list of files. Is it and old one?")
+                
         inputs = [ (os.path.join(params["dataDir"],ifil[1]),
                     ifil[0],params["pfx"] if len(ifil)<3 else ifil[2],True,
                     params.get("genpfx",None) if len(ifil)<4 else ifil[3] )
@@ -306,8 +312,9 @@ def runTraining(effFitter,useAbsWeight=True):
 # -------------------------------------------------------------------------------------
 def runEvaluation(effFitter):
     clf_keys = filter(lambda x: x in effFitter.clfs.keys(),params["classifiers"])
-     
+    print(clf_keys)
     for key in clf_keys:
+        print(key)
         target = target_name(key)
         catKey = '%s_prob_0' % (target)
         if not catKey in effFitter.df.columns:

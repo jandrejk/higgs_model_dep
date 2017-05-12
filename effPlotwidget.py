@@ -477,7 +477,7 @@ def plotRelDiff_imshow(groupby_objects,binBoundaries,
             plt.text(j, i, np.round(cm[i, j],2), horizontalalignment="center",
                      color="white" if cm[i, j] > thresh else "black")
         """
-        if (cm_abs_diff[i,j] > 2*cm_err[i,j] ) :
+        if (cm_abs_diff[i,j] > 3.*cm_err[i,j] ) :
             plt.text(j, i, np.round(cm[i, j],2), horizontalalignment="center",
                      color="white" if cm[i, j] > thresh else "black")
 
